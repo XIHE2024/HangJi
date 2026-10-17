@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#102f32">
+  <title>账号设置 · 航迹</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/auth.css">
+</head>
+<body>
+<main class="account-shell">
+  <aside class="account-aside">
+    <a class="auth-brand" href="/"><span aria-hidden="true">↗</span><b>航迹<small>FLIGHT OBSERVATORY</small></b></a>
+    <nav aria-label="账号页面导航"><a href="/">← 返回研究工作台</a><a href="/account">账号与安全</a></nav>
+    <div class="account-note">修改密码后，当前账号在所有设备上的登录都会立即失效。重新登录时可选择在个人设备保持登录 30 天。</div>
+  </aside>
+  <section class="account-main">
+    <div class="account-card">
+      <div class="overline">ACCOUNT SECURITY</div>
+      <h1>账号与安全</h1>
+      <p id="account-name">正在读取账号信息…</p>
+      <form id="password-form">
+        <label for="old-password">当前密码</label>
+        <input id="old-password" type="password" autocomplete="current-password" required maxlength="128" placeholder="输入当前密码">
+        <label for="new-password">新密码</label>
+        <input id="new-password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required placeholder="至少 10 个字符">
+        <label for="confirm-password">确认新密码</label>
+        <input id="confirm-password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required placeholder="再次输入新密码">
+        <label class="remember"><input id="show-account-passwords" type="checkbox">显示上面的密码</label>
+        <div id="message" role="status" class="auth-message" aria-live="polite"></div>
+        <button id="save-password" type="submit" class="auth-submit" disabled><span>正在连接…</span><b aria-hidden="true">↗</b></button>
+      </form>
+      <div class="recovery-note"><strong>安全提示</strong><span>密码修改成功后会返回登录页，并撤销所有设备上的旧会话。</span></div>
+      <a class="back-link" href="/">← 返回航迹研究工作台</a>
+    </div>
+  </section>
+</main>
+<script src="/account.js"></script>
+</body>
+</html>

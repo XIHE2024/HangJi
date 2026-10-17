@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#102f32">
+  <title>登录 · 航迹</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/auth.css">
+</head>
+<body>
+<main class="auth-shell">
+  <section class="auth-story" aria-label="航迹介绍">
+    <a class="auth-brand" href="/login"><span aria-hidden="true">↗</span><b>航迹<small>FLIGHT OBSERVATORY</small></b></a>
+    <div class="story-content">
+      <div class="overline">SPACE WEATHER × AVIATION</div>
+      <h1>从扰动出发，<br>理解每一次抵达。</h1>
+      <p>航班与空间天气研究系统</p>
+      <div class="flight-path" aria-hidden="true"><i></i><span>PEK</span><b>↗</b><span>SHA · PVG · CAN · SZX</span></div>
+      <div class="story-features">
+        <div><span>01</span><b>真实航线回测</b><small>2019 独立测试集</small></div>
+        <div><span>02</span><b>空间天气监测</b><small>Dst 与 Kp 自动更新</small></div>
+        <div><span>03</span><b>透明预测边界</b><small>同时展示误差区间</small></div>
+      </div>
+    </div>
+    <div class="story-status"><span class="status-dot"></span><div><strong>服务可用</strong><small>账号数据与会话由服务器保存</small></div></div>
+  </section>
+
+  <section class="auth-panel">
+    <div class="auth-box">
+      <div class="mobile-brand"><span>↗</span> 航迹</div>
+      <div class="service-status" id="service-status"><i></i><span>正在连接服务…</span></div>
+      <div class="overline">WELCOME TO HANGJI</div>
+      <h2 id="form-title">欢迎回到航迹</h2>
+      <p id="form-subtitle">登录研究账号，继续查看航线与空间天气。</p>
+
+      <div class="auth-tabs" role="tablist" aria-label="账号操作">
+        <button id="login-tab" type="button" role="tab" aria-selected="true">登录</button>
+        <button id="register-tab" type="button" role="tab" aria-selected="false">注册</button>
+      </div>
+
+      <form id="auth-form" novalidate>
+        <label for="username">用户名</label>
+        <div class="input-wrap"><span aria-hidden="true">ID</span><input id="username" name="username" autocomplete="username" minlength="3" maxlength="32" placeholder="输入用户名" required></div>
+
+        <label for="password">密码</label>
+        <div class="password-wrap input-wrap"><span aria-hidden="true">••</span><input id="password" name="password" type="password" autocomplete="current-password" maxlength="128" placeholder="输入密码" required><button type="button" id="show-password" aria-label="显示密码">显示</button></div>
+
+        <div id="confirm-row" hidden>
+          <label for="confirm-password">确认密码</label>
+          <div class="input-wrap"><span aria-hidden="true">••</span><input id="confirm-password" type="password" autocomplete="new-password" maxlength="128" placeholder="再次输入密码"></div>
+        </div>
+
+        <p id="registration-hint" class="form-hint" hidden>用户名支持 3—32 位中文、字母、数字、_ 或 -；密码至少 10 个字符。</p>
+        <div id="password-strength" class="password-strength" hidden><i></i><span>建议使用字母、数字与符号组合</span></div>
+
+        <div class="form-options" id="remember-row">
+          <label class="remember"><input id="remember-me" type="checkbox">在此设备保持登录 30 天</label>
+          <span>公共设备请勿勾选</span>
+        </div>
+
+        <div id="auth-message" class="auth-message" role="status" aria-live="polite"></div>
+        <button class="auth-submit" id="auth-submit" type="submit" disabled><span>正在连接…</span><b aria-hidden="true">↗</b></button>
+      </form>
+
+      <div class="recovery-note"><strong>无法登录？</strong><span>忘记密码时，请联系网站管理员在服务器端重置；系统不会通过网页显示原密码。</span></div>
+      <p class="privacy-note">为保障账号安全，系统记录注册及登录时间、来源 IP 与浏览器信息，仅管理员可查看。密码使用加盐哈希保存。</p>
+      <div class="auth-bottom">航迹｜航班与空间天气研究系统<small>研究估计不替代航空公司与机场运行信息</small></div>
+    </div>
+  </section>
+</main>
+<script src="/auth.js"></script>
+</body>
+</html>

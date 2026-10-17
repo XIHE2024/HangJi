@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#102f32">
+  <title>管理后台 · 航迹</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<aside class="sidebar">
+  <a class="brand" href="/"><span class="brand-icon" aria-hidden="true">↗</span><span>航迹<small>FLIGHT OBSERVATORY</small></span></a>
+  <div class="nav-caption">管理员工作台</div>
+  <nav aria-label="后台导航">
+    <a class="nav active" href="/admin"><span>◫</span><b>用户与登录记录</b></a>
+    <a class="nav" href="/"><span>↗</span><b>返回研究系统</b></a>
+    <a class="nav" href="/account"><span>◎</span><b>账号设置</b></a>
+  </nav>
+  <div class="sidebar-note"><div class="service-line"><span class="signal-dot"></span><strong>账号管理</strong></div><p>注册信息 · 登录审计</p><span>密码和哈希不会显示</span></div>
+</aside>
+<main id="main-content">
+  <header class="topbar"><div class="top-context"><span class="mobile-mark">航迹管理</span><span>管理后台</span><span class="slash">/</span><strong>用户与登录</strong></div><div class="top-right"><span id="admin-name"></span><button class="button ghost compact" id="logout">退出</button></div></header>
+  <div class="content-shell">
+    <section class="page active">
+      <div class="page-head"><div><div class="eyebrow">ADMINISTRATION</div><h1>账号状态，一目了然。</h1><p>查看注册用户、活跃会话和登录审计。所有时间按北京时间显示。</p></div><button id="refresh-admin" class="button primary">刷新数据</button></div>
+      <div id="admin-message" class="status-line" role="status" aria-live="polite"></div>
+      <div class="stats" id="admin-stats"><div class="stat skeleton"></div><div class="stat skeleton"></div><div class="stat skeleton"></div><div class="stat skeleton"></div></div>
+      <form id="search-form" class="admin-search"><label>按用户名筛选<input id="search" maxlength="32" placeholder="输入用户名，留空查看全部"></label><button class="button secondary" type="submit">查询记录</button></form>
+
+      <article class="card table-card">
+        <div class="card-head"><div><span class="section-kicker">账户目录</span><h2>所有注册用户</h2><p>活跃会话指最近 15 分钟内访问，且登录仍未过期。</p></div><span id="user-count" class="tiny"></span></div>
+        <div class="table-hint">表格可横向滚动；首列会保持可见</div>
+        <div class="table-wrap"><table><thead><tr><th>用户名 / 角色</th><th>注册时间</th><th>注册 IP</th><th>最近登录 / IP</th><th>成功登录</th><th>活跃会话</th><th>账号状态 / 操作</th></tr></thead><tbody id="users-body"></tbody></table></div>
+        <div class="admin-pages"><button class="button secondary compact" id="users-prev">上一页</button><span id="users-page"></span><button class="button secondary compact" id="users-next">下一页</button></div>
+      </article>
+
+      <article class="card table-card">
+        <div class="card-head"><div><span class="section-kicker">安全审计</span><h2>登录与账号活动</h2><p>包括注册、登录成功/失败、退出、改密和管理员操作。</p></div><span id="event-count" class="tiny"></span></div>
+        <div class="table-hint">表格可横向滚动；首列会保持可见</div>
+        <div class="table-wrap"><table><thead><tr><th>时间</th><th>用户名</th><th>操作</th><th>结果</th><th>来源 IP</th><th>浏览器 / 设备</th></tr></thead><tbody id="events-body"></tbody></table></div>
+        <div class="admin-pages"><button class="button secondary compact" id="events-prev">上一页</button><span id="events-page"></span><button class="button secondary compact" id="events-next">下一页</button></div>
+      </article>
+      <p class="subtle">数据库只保存加盐密码哈希，后台不会返回密码或哈希。来源 IP 仅是连接信息，不能视为真实身份。</p>
+    </section>
+  </div>
+</main>
+<script src="/admin.js"></script>
+</body>
+</html>
