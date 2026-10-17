@@ -1,0 +1,21 @@
+.deps/
+.venv/
+__pycache__/
+*.py[cod]
+*.zip
+
+# Local runtime state and secrets
+管理员初始账户.txt
+分享网址.txt
+data/accounts.sqlite3*
+data/gateway_secret.txt
+data/issued_forecasts.json
+data/latest_*.json
+data/public_url.txt
+data/share-processes.json
+data/*.log
+data/*_preview.png
+data/*verification*.json
+
+# Local tunnel executable
+tools/
