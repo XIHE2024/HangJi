@@ -15,7 +15,6 @@ COPY . ./
 RUN mkdir -p /app/state
 
 EXPOSE 8080
-VOLUME ["/app/state"]
 
 HEALTHCHECK --interval=30s --timeout=8s --start-period=90s --retries=3 \
   CMD python -c "import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:'+os.environ.get('PORT','8080')+'/api/health',timeout=5).read()" || exit 1
