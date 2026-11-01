@@ -24,8 +24,8 @@ function setMode(value) {
   $('password').minLength = register ? 10 : 1;
   $('form-title').textContent = register ? '创建你的研究账号' : '欢迎回到航迹';
   $('form-subtitle').textContent = register
-    ? '注册后即可进入航线与空间天气研究工作台。'
-    : '登录研究账号，继续查看航线与空间天气。';
+    ? '注册后即可进入机场小时延误与空间天气研究工作台。'
+    : '登录研究账号，继续查看机场小时延误与空间天气。';
   buttonLabel(register ? '创建账号' : '登录工作台');
   $('auth-message').textContent = '';
   $('auth-message').classList.remove('success');

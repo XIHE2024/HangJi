@@ -1,128 +1,312 @@
 {
-  "target": "到港延误 = 实际到达 − 计划到达（分钟，提前到达保留负值）",
-  "trained_at": "2026-10-08T14:36:47.838980+00:00",
-  "valid_rows": 110883,
+  "asset_id": "pek-hourly-v4-20261028T114047Z",
+  "schema_version": 4,
+  "prediction_unit": "airport_hour",
+  "interval_unit": "airport_hour",
+  "primary_metric": "unweighted_hour_mae",
+  "timezone": "Asia/Shanghai",
+  "product_scope": "airport_hour_average_departure_delay",
+  "target": "PEK 计划离港窗口 [T, T+1h) 内有效出港航班的平均离港延误（分钟）",
+  "target_definition": "离港延误 = 实际出发时间 − 计划出发时间；提前出发保留负值。",
+  "airport": "PEK",
+  "horizon_minutes": 60,
+  "minimum_flights_per_window": 5,
+  "trained_at": "2026-10-28T11:40:47.720688+00:00",
+  "valid_windows": 23895,
+  "valid_departures": 867757,
+  "source_snapshot": {
+    "flights_peK_raw_cache.pkl": {
+      "path": "E:\\航迹\\outputs\\DT_Dst_ROTI_20260929\\flights_peK_raw_cache.pkl",
+      "bytes": 94163856,
+      "sha256": "7EAEB843AA7ABFB73699C7BF32789D3A3C7400293616CC7901AF77195FE1D556"
+    },
+    "dst_hourly.csv": {
+      "path": "E:\\航迹\\outputs\\DT_Dst_ROTI_20260929\\dst_hourly.csv",
+      "bytes": 1156168,
+      "sha256": "60BBB1EF5B86459F5684BDA8107826BE79247578D48E1574EFEA21DE509B0680"
+    },
+    "roti_hourly.csv": {
+      "path": "E:\\航迹\\outputs\\DT_Dst_ROTI_20260929\\roti_hourly.csv",
+      "bytes": 1632396,
+      "sha256": "9687EB4E65E011984304B9DFEA0DD862291AD9FA17A603AB7F4696DD2B9F14E8"
+    }
+  },
   "audit": {
-    "route_records": 125227,
-    "cancelled": 5845,
-    "invalid_times_removed": 8499
+    "source_records": 968285,
+    "cancelled_records": 23216,
+    "invalid_or_early_outlier_records": 3170,
+    "duplicate_operational_records_removed": 69872,
+    "valid_physical_departures": 872027,
+    "all_observed_hours": 25705,
+    "hours_below_minimum_flights": 1810,
+    "valid_windows": 23895,
+    "valid_departures_in_windows": 867757,
+    "missing_dst_windows": 0,
+    "missing_roti_utc_hypothesis_windows": 73,
+    "missing_roti_local_hypothesis_windows": 65
   },
   "splits": {
     "train": [
       "2017-01-01",
       "2018-06-30",
-      50297
+      11863
     ],
     "validation": [
       "2018-07-01",
       "2018-09-30",
-      9629
+      2008
     ],
     "calibration": [
       "2018-10-01",
       "2018-12-31",
-      10642
+      2018
     ],
     "test": [
       "2019-01-01",
       "2019-12-31",
-      40315
+      8006
     ]
   },
-  "selected": "baseline",
-  "validation": {
-    "baseline": {
-      "mae": 52.019408257377464,
-      "rmse": 78.79713313200939,
-      "bias": 1.9840628677150947,
-      "n": 9629
-    },
-    "space": {
-      "mae": 52.19226117067262,
-      "rmse": 78.50429483268472,
-      "bias": 2.657717943602569,
-      "n": 9629
-    }
-  },
-  "test": {
-    "mae": 31.697117360066333,
-    "rmse": 54.41324004221694,
-    "bias": -2.215970026852873,
-    "n": 40315
-  },
-  "constant_baseline_test": {
-    "mae": 30.388416222249784,
-    "rmse": 56.33392076536315,
-    "bias": -9.367555500434081,
-    "n": 40315
-  },
-  "routes": [
+  "rolling_folds": [
     {
-      "code": "SHA",
-      "name": "上海虹桥",
-      "mae": 28.720997752477373,
-      "rmse": 46.20692149315424,
-      "bias": 5.63568067154633,
-      "n": 14616,
-      "mean_DT": 3.5747810618500275,
-      "median_DT": -8.0,
-      "delay15_rate": 0.1933497536945813,
-      "coverage80": 0.5389983579638752,
-      "radius80": 19.24645062814153,
-      "baseline_mae": 28.720997752477373,
-      "space_mae": 28.524279108251097
+      "fold": "F1",
+      "train_windows": 3911,
+      "validation_windows": 2013,
+      "model_a_mae": 40.50692071626124,
+      "model_b_mae": 40.18008573623348,
+      "b_relative_improvement": 0.00806862072575554,
+      "model_a_bias": -32.280898673080216,
+      "model_b_bias": -31.857059378578825,
+      "space_complete_windows": 2010,
+      "b_strictly_better": true
     },
     {
-      "code": "PVG",
-      "name": "上海浦东",
-      "mae": 28.097732542981873,
-      "rmse": 53.08886226310042,
-      "bias": -1.387815960792354,
-      "n": 2443,
-      "mean_DT": 4.051575931232092,
-      "median_DT": -11.0,
-      "delay15_rate": 0.18133442488743348,
-      "coverage80": 0.5751125665165779,
-      "radius80": 17.78284930720587,
-      "baseline_mae": 28.097732542981873,
-      "space_mae": 27.956448052827774
+      "fold": "F2",
+      "train_windows": 5924,
+      "validation_windows": 2018,
+      "model_a_mae": 19.422798500485865,
+      "model_b_mae": 19.29648914612384,
+      "b_relative_improvement": 0.006503149088369805,
+      "model_a_bias": 13.327924431577758,
+      "model_b_bias": 13.046668549903583,
+      "space_complete_windows": 2018,
+      "b_strictly_better": true
     },
     {
-      "code": "CAN",
-      "name": "广州白云",
-      "mae": 29.480045325611535,
-      "rmse": 52.29873221655704,
-      "bias": -3.87546332473164,
-      "n": 11062,
-      "mean_DT": 5.312601699511842,
-      "median_DT": -9.0,
-      "delay15_rate": 0.2250045199783041,
-      "coverage80": 0.575393238112457,
-      "radius80": 20.546386246989265,
-      "baseline_mae": 29.480045325611535,
-      "space_mae": 29.658396856518817
+      "fold": "F3",
+      "train_windows": 7942,
+      "validation_windows": 1977,
+      "model_a_mae": 13.592525805151602,
+      "model_b_mae": 13.380608960299192,
+      "b_relative_improvement": 0.015590689169197211,
+      "model_a_bias": 7.954986067610387,
+      "model_b_bias": 7.496564596279917,
+      "space_complete_windows": 1977,
+      "b_strictly_better": true
     },
     {
-      "code": "SZX",
-      "name": "深圳宝安",
-      "mae": 37.996732919997164,
-      "rmse": 64.68190139492002,
-      "bias": -10.28761117250267,
-      "n": 12194,
-      "mean_DT": 18.223716581925537,
-      "median_DT": -3.0,
-      "delay15_rate": 0.3090044284074135,
-      "coverage80": 0.639330818435296,
-      "radius80": 30.426996547540462,
-      "baseline_mae": 37.996732919997164,
-      "space_mae": 38.0289878609744
+      "fold": "F4",
+      "train_windows": 9919,
+      "validation_windows": 1944,
+      "model_a_mae": 17.313195806462367,
+      "model_b_mae": 17.576680367440176,
+      "b_relative_improvement": -0.015218713166719881,
+      "model_a_bias": -5.791352842829682,
+      "model_b_bias": -4.387383006377467,
+      "space_complete_windows": 1939,
+      "b_strictly_better": false
     }
   ],
+  "selected_hyperparameters": {
+    "learning_rate": 0.03,
+    "max_iter": 160,
+    "max_leaf_nodes": 7,
+    "min_samples_leaf": 80,
+    "l2_regularization": 30.0,
+    "residual_weight": 0.75
+  },
+  "alpha_zero_collapse_asserted": null,
+  "model_design": {
+    "model_a": "weekday-hour historical median time model",
+    "model_b": "model A + shrunk HGB residual correction using only lagged Dst-change and ROTI",
+    "time_features": [
+      "weekday",
+      "hour"
+    ],
+    "space_features": [
+      "dst_rate_lag",
+      "roti_lag"
+    ],
+    "residual_weight": 0.75,
+    "space_feature_hour": "T_local - 10h under UTC hypothesis",
+    "missing_space_rule": "model B operational prediction equals model A"
+  },
+  "roti_timezone_status": "unconfirmed_assumed_utc",
+  "timezone_sensitivity": {
+    "utc_hypothesis": {
+      "validation": {
+        "mae": 19.79958686550107,
+        "rmse": 39.220247146645974,
+        "bias": -10.345500402880164,
+        "n": 2008
+      },
+      "test": {
+        "mae": 16.021061270078082,
+        "rmse": 26.537473212895758,
+        "bias": 0.8175326317465462,
+        "n": 8006
+      },
+      "complete_windows": 23822
+    },
+    "beijing_time_hypothesis": {
+      "validation": {
+        "mae": 19.844923752644757,
+        "rmse": 38.922211952580234,
+        "bias": -9.55366711500976,
+        "n": 2008
+      },
+      "test": {
+        "mae": 16.086560177525275,
+        "rmse": 26.569482001313936,
+        "bias": 0.9940917166728998,
+        "n": 8006
+      },
+      "complete_windows": 23830
+    },
+    "selection_prohibited": true,
+    "note": "TEC 文件头时区未确认；敏感性结果不得用于事后择优选择时区。"
+  },
+  "selected": "baseline",
+  "selected_reason": "ROTI 时区未确认且缺少全新确认段，生产主模型固定为 A；B 仅作历史研究对照。",
+  "validation": {
+    "baseline": {
+      "mae": 20.045080097537937,
+      "rmse": 39.65761217032516,
+      "bias": -11.113723914586174,
+      "n": 2008
+    },
+    "space": {
+      "mae": 19.79958686550107,
+      "rmse": 39.220247146645974,
+      "bias": -10.345500402880164,
+      "n": 2008
+    },
+    "seasonal": {
+      "mae": 20.045080097537937,
+      "rmse": 39.65761217032516,
+      "bias": -11.113723914586174,
+      "n": 2008
+    }
+  },
+  "validation_relative_improvement": 0.01224705667636722,
+  "validation_bootstrap": {
+    "direction": "mae_b_minus_mae_a",
+    "point": -0.24549323203686768,
+    "lower": -0.3907253605165689,
+    "upper": -0.10213004122611993,
+    "samples": 5000,
+    "seed": 42,
+    "block": "local_calendar_day",
+    "days": 92
+  },
+  "validation_gates": {
+    "relative_improvement_at_least_1pct": true,
+    "cv_wins_at_least_3_of_4": true,
+    "validation_bootstrap_upper_below_zero": true,
+    "absolute_bias_not_worse_by_more_than_1min": true,
+    "no_future_information": true
+  },
+  "validation_candidate": true,
+  "internal_screening_gates": {
+    "relative_improvement_at_least_1pct": true,
+    "cv_wins_at_least_3_of_4": true,
+    "validation_bootstrap_upper_below_zero": true,
+    "absolute_bias_not_worse_by_more_than_1min": true,
+    "no_future_information": true
+  },
+  "internal_screening_pass": true,
+  "historical_holdout_gates": {
+    "model_b_mae_below_model_a": true,
+    "test_bootstrap_upper_below_zero": false
+  },
+  "production_gates": {
+    "internal_screening_pass": true,
+    "historical_holdout_screen_pass": false,
+    "roti_timezone_confirmed_utc": false,
+    "fresh_confirmation_available": false
+  },
+  "fresh_confirmation_available": false,
+  "test": {
+    "mae": 16.02659824711901,
+    "rmse": 26.599334300519153,
+    "bias": 0.7076647581736119,
+    "n": 8006
+  },
+  "baseline_model_test": {
+    "mae": 16.02659824711901,
+    "rmse": 26.599334300519153,
+    "bias": 0.7076647581736119,
+    "n": 8006
+  },
+  "space_model_test": {
+    "mae": 16.021061270078082,
+    "rmse": 26.537473212895758,
+    "bias": 0.8175326317465462,
+    "n": 8006
+  },
+  "simple_baseline_test": {
+    "mae": 16.02659824711901,
+    "rmse": 26.599334300519153,
+    "bias": 0.7076647581736119,
+    "n": 8006
+  },
+  "test_bootstrap": {
+    "direction": "mae_b_minus_mae_a",
+    "point": -0.0055369770409292585,
+    "lower": -0.06253435012044246,
+    "upper": 0.053627725750882586,
+    "samples": 5000,
+    "seed": 42,
+    "block": "local_calendar_day",
+    "days": 365
+  },
+  "interval_calibration": {
+    "nominal_coverage": 0.8,
+    "model_a_radius": 17.44910780276634,
+    "model_b_operational_radius": 17.453348261917554,
+    "model_a_calibration_coverage": 0.800792864222002,
+    "model_b_calibration_coverage": 0.800792864222002,
+    "test_selected_model_coverage": 0.7307019735198601
+  },
+  "airports": [
+    {
+      "code": "PEK",
+      "name": "北京首都国际机场",
+      "window_minutes": 60,
+      "test_windows": 8006,
+      "test_flights": 285261,
+      "mean_flights_per_window": 35.63090182363228,
+      "mean_actual_delay": 31.679026238348488,
+      "mae": 16.02659824711901,
+      "rmse": 26.599334300519153,
+      "bias": 0.7076647581736119,
+      "baseline_model_mae": 16.02659824711901,
+      "space_model_mae": 16.021061270078082,
+      "simple_baseline_mae": 16.02659824711901,
+      "relative_improvement_vs_simple": 0.0,
+      "coverage80": 0.7307019735198601,
+      "radius80_model_a": 17.44910780276634,
+      "radius80_model_b": 17.453348261917554
+    }
+  ],
+  "comparison_note": "所有误差按机场一小时窗口等权；模型 B 缺测窗口逐窗口回退模型 A。",
+  "horizon_note": "主目标固定为 1 小时机场平均延误，不能与单航班、航线或 3 小时平均值混用。",
   "limitations": [
-    "训练数据截至 2018 年，2019 年为独立测试；对当前年份未验证。",
-    "不包含地面天气、流量和前序航班；不预测航班取消。",
-    "北京 TEC 时区按 UTC 假定；ROTI 为单站 5 分钟标准差的小时均值，非论文的小时窗口指标。",
-    "历史空间天气输入滞后 2 个小时标签；未模拟真实发布延迟。",
-    "80% 区间用 2018 年四季度残差校准，覆盖率可能随年份变化。"
+    "当前航班数据只支持北京首都机场 PEK 出港，不能外推为任意机场或某条航线。",
+    "2018 Q3 与 2019 指标已参与旧项目或本轮设计认识，只能作为历史开发/留出证据。",
+    "不包含地面天气、机场流量实况、跑道构型和前序航班；不预测取消。",
+    "TEC 文件头时区尚未经数据提供者确认，因此模型 B 当前只能作为研究对照。",
+    "缺少一个从未用于设计或结果查看的全新确认时间段，模型 B 当前不能生产启用。",
+    "观察性预测增益不等于空间天气对延误的因果效应。"
   ]
 }

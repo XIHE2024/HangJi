@@ -4,7 +4,7 @@ import math
 import urllib.request
 import urllib.parse
 import urllib.error
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from concurrent.futures import ThreadPoolExecutor
 
 NOAA_URL='https://services.swpc.noaa.gov/products/kyoto-dst.json'
@@ -101,34 +101,90 @@ def get_space_weather():
     return result
 
 
-def fetch_route(route,key):
+def _aware_datetime(value):
+    """Parse an ISO timestamp only when its UTC offset is explicit."""
+    if not isinstance(value,str) or not value.strip(): return None
+    try:
+        stamp=datetime.fromisoformat(value.replace('Z','+00:00'))
+    except ValueError:
+        return None
+    return stamp if stamp.tzinfo is not None else None
+
+
+def fetch_airport(key):
+    """Return PEK departure-delay observations aggregated by scheduled local hour.
+
+    The connector deliberately exposes no per-flight forecast.  ``complete`` only
+    describes whether the provider query was fully paginated; observation coverage
+    for an hour is represented by its scheduled and observed flight counts.
+    """
     if not key: raise SourceError('请配置 Aviationstack API 密钥，或使用历史回测。')
-    params=urllib.parse.urlencode({'access_key':key,'dep_iata':'PEK','arr_iata':route,'limit':100})
+    airport='PEK';limit=100
+    params=urllib.parse.urlencode({'access_key':key,'dep_iata':airport,'limit':limit})
     payload=fetch_json(FLIGHTS_URL+'?'+params)
     if not isinstance(payload,dict) or payload.get('error'):
         raise SourceError('航班服务未授权或套餐不支持本查询，请检查密钥和接口权限。')
     data=payload.get('data')
     if not isinstance(data,list): raise SourceError('航班数据格式异常。')
-    output=[];seen=set()
-    for f in data:
-        dep=f.get('departure') or {};arr=f.get('arrival') or {};flight=f.get('flight') or {}
-        if dep.get('iata')!='PEK' or arr.get('iata')!=route: continue
-        number=flight.get('iata') or flight.get('number') or '未知'
-        identity=(number,dep.get('scheduled'))
-        if identity in seen:continue
+
+    local_timezone=timezone(timedelta(hours=8))
+    seen=set();windows={}
+    for index,item in enumerate(data):
+        if not isinstance(item,dict): continue
+        departure=item.get('departure') or {}
+        if departure.get('iata')!=airport: continue
+        scheduled=_aware_datetime(departure.get('scheduled'))
+        if scheduled is None: continue
+
+        flight=item.get('flight') or {}
+        aircraft=item.get('aircraft') or {}
+        registration=str(aircraft.get('registration') or '').strip().upper()
+        number=str(flight.get('iata') or flight.get('number') or '').strip().upper()
+        schedule_key=scheduled.astimezone(timezone.utc).isoformat()
+        # Prefer the physical aircraft when available so codeshares are not counted twice.
+        # Without a registration, a flight number is the safest available fallback.
+        identity=('REG',registration,schedule_key) if registration else ('FLT',number or index,schedule_key)
+        if identity in seen: continue
         seen.add(identity)
-        delay=None
-        try:
-            actual=datetime.fromisoformat(arr['actual'].replace('Z','+00:00'))
-            scheduled=datetime.fromisoformat(arr['scheduled'].replace('Z','+00:00'))
-            if actual.tzinfo and scheduled.tzinfo: delay=(actual-scheduled).total_seconds()/60
-        except (KeyError,TypeError,ValueError,AttributeError): pass
-        output.append({'flight_no':number,'destination':route,'status':f.get('flight_status'),
-                       'scheduled_departure':dep.get('scheduled'),'scheduled_arrival':arr.get('scheduled'),
-                       'estimated_arrival':arr.get('estimated'),'actual_arrival':arr.get('actual'),
-                       'actual_DT':delay,'airline':(f.get('airline') or {}).get('iata')})
-    total=(payload.get('pagination') or {}).get('total')
-    return {'source':'Aviationstack','fetched_at':datetime.now(timezone.utc).isoformat(),
-            'route':route,'flights':output,'provider_total':total,'returned':len(output),
-            'truncated':isinstance(total,(float,int)) and total>100,
-            'notice':'返回当前接口首批最多 100 条记录；时间以服务商返回为准，共享航班可能对应同一次执飞。'}
+
+        window_start=scheduled.astimezone(local_timezone).replace(minute=0,second=0,microsecond=0)
+        window=windows.setdefault(window_start,{'scheduled_flights':0,'observed_flights':0,'delay_total':0.0})
+        window['scheduled_flights']+=1
+        actual=_aware_datetime(departure.get('actual'))
+        if actual is None: continue
+        delay=(actual-scheduled).total_seconds()/60
+        if not math.isfinite(delay): continue
+        window['observed_flights']+=1
+        window['delay_total']+=delay
+
+    output=[]
+    for window_start,values in sorted(windows.items()):
+        observed=values['observed_flights']
+        output.append({
+            'window_start':window_start.isoformat(),
+            'window_end':(window_start+timedelta(hours=1)).isoformat(),
+            'scheduled_flights':values['scheduled_flights'],
+            'observed_flights':observed,
+            'actual_mean_delay':values['delay_total']/observed if observed else None,
+        })
+
+    pagination=payload.get('pagination') or {}
+    total=pagination.get('total')
+    try:
+        provider_total=int(total)
+    except (TypeError,ValueError,OverflowError):
+        provider_total=None
+    try:
+        offset=max(0,int(pagination.get('offset',0)))
+        count=max(0,int(pagination.get('count',len(data))))
+    except (TypeError,ValueError,OverflowError):
+        offset=0;count=len(data)
+    truncated=offset+count<provider_total if provider_total is not None else len(data)>=limit
+    returned=sum(window['scheduled_flights'] for window in output)
+    return {
+        'source':'Aviationstack','fetched_at':datetime.now(timezone.utc).isoformat(),
+        'airport':airport,'provider_total':provider_total,'returned':returned,
+        'truncated':truncated,'complete':not truncated,'windows':output,
+        'coverage_note':'complete 仅表示提供商分页完整；每小时 observed_flights / scheduled_flights 才表示实际离港观测覆盖。',
+        'notice':'按 PEK 计划离港小时聚合；实际平均延误 = departure.actual − departure.scheduled，不表示单次航班或航线延误。',
+    }

@@ -22,7 +22,7 @@ import time
 from urllib.parse import urlparse, parse_qs
 
 import modeling as m
-from sources import SourceError, get_space_weather, fetch_route
+from sources import SourceError, get_space_weather, fetch_airport
 from auth_store import (
     AuthStore,
     AuthError,
@@ -39,11 +39,12 @@ WEATHER = None
 FLIGHT_CACHE = {}
 LOCK = threading.Lock()
 FORECASTS = {}
-ROUTES = m.ROUTES
+AIRPORTS = m.AIRPORTS
 META = {}
 MODEL = None
 TEST = None
 HISTORICAL_SPACE = None
+EVENT_COMPARISON = None
 WEATHER_LOCK = threading.Lock()
 AUTH = None
 PROXY_SECRET = ''
@@ -154,9 +155,9 @@ def refresh_weather():
         return weather_view(), False
 
 
-def auto_parameters(scheduled):
-    """Only exact historical feature-hour matches are fed to the validated model."""
-    stamp = (m.pd.Timestamp(scheduled) - m.pd.Timedelta(hours=8)).floor('h') - m.pd.Timedelta(hours=2)
+def auto_parameters(window_start):
+    """Only exact, completed historical hours are fed to the validated model."""
+    stamp = (m.pd.Timestamp(window_start) - m.pd.Timedelta(hours=8)).floor('h') - m.pd.Timedelta(hours=2)
     result = {'source': '自动匹配', 'feature_hour_utc': stamp.isoformat() + 'Z', 'dst': None, 'roti': None, 'usable': False}
     if HISTORICAL_SPACE is not None and stamp in HISTORICAL_SPACE.index:
         row = HISTORICAL_SPACE.loc[stamp]
@@ -166,36 +167,34 @@ def auto_parameters(scheduled):
             source='本地历史 Dst 与北京站 TEC',
         )
         result['usable'] = result['dst'] is not None and result['roti'] is not None
-        result['reason'] = '已自动匹配起飞前历史参数。' if result['usable'] else '对应历史小时存在缺测，使用基础航班模型。'
+        result['reason'] = '已自动匹配预报窗口前可用的历史参数。' if result['usable'] else '对应历史小时存在缺测，使用基础机场模型。'
     else:
-        result['reason'] = '该时刻没有可匹配的北京站 ROTI；最新 Dst 与 Kp 仅供观测参考，不能当作该时刻的未来参数。使用基础航班模型。'
+        result['reason'] = '该窗口没有可匹配的北京站 ROTI；最新 Dst 与 Kp 仅供观测参考，不能代替未来参数。使用基础机场模型。'
     return result
 
 
-def attach_forecasts(response):
-    """Distinguish an issued-before-departure forecast from retrospective computation."""
+def attach_window_forecasts(response):
+    """Attach one forecast per airport-hour, never one forecast per flight."""
     now = datetime.now(timezone.utc)
     with LOCK:
-        for flight in response['flights']:
-            flight['prediction'] = None
-            flight['prediction_kind'] = 'unavailable'
-            flight['prediction_issued_at'] = None
-            if flight['status'] == 'cancelled':
-                continue
+        for window in response.get('windows', []):
+            window['prediction'] = None
+            window['prediction_kind'] = 'unavailable'
+            window['prediction_issued_at'] = None
             try:
-                scheduled = datetime.fromisoformat(flight['scheduled_departure'].replace('Z', '+00:00'))
-                if scheduled.tzinfo is None:
+                start = datetime.fromisoformat(window['window_start'].replace('Z', '+00:00'))
+                if start.tzinfo is None:
                     continue
-                identity = flight['flight_no'] + '|' + scheduled.astimezone(timezone.utc).isoformat()
+                identity = response['airport'] + '|' + start.astimezone(timezone.utc).isoformat() + '|60'
                 saved = FORECASTS.get(identity)
                 if saved:
-                    flight.update(prediction=saved['prediction'], prediction_kind='predeparture', prediction_issued_at=saved['issued_at'])
+                    window.update(prediction=saved['prediction'], prediction_kind='prewindow', prediction_issued_at=saved['issued_at'])
                     continue
-                local = scheduled.astimezone(timezone(timedelta(hours=8))).replace(tzinfo=None)
-                prediction = m.estimate(MODEL, response['route'], local, flight['airline'] or '??')
-                kind = 'predeparture' if scheduled > now and flight['status'] == 'scheduled' else 'retrospective'
-                flight.update(prediction=prediction, prediction_kind=kind, prediction_issued_at=now.isoformat())
-                if kind == 'predeparture':
+                local = start.astimezone(timezone(timedelta(hours=8))).replace(tzinfo=None)
+                prediction = m.estimate(MODEL, response['airport'], local)
+                kind = 'prewindow' if start > now else 'retrospective'
+                window.update(prediction=prediction, prediction_kind=kind, prediction_issued_at=now.isoformat())
+                if kind == 'prewindow':
                     FORECASTS[identity] = {'prediction': prediction, 'issued_at': now.isoformat(), 'model_version': META['trained_at']}
             except (ValueError, TypeError, AttributeError):
                 continue
@@ -208,8 +207,12 @@ def clean(obj):
         return {str(key): clean(value) for key, value in obj.items()}
     if isinstance(obj, (list, tuple)):
         return [clean(value) for value in obj]
-    if isinstance(obj, (m.pd.Timestamp, datetime)):
-        return obj.isoformat()
+    if isinstance(obj, m.pd.Timestamp):
+        stamp = obj.tz_localize(m.TIMEZONE) if obj.tzinfo is None else obj
+        return stamp.isoformat()
+    if isinstance(obj, datetime):
+        stamp = obj.replace(tzinfo=timezone(timedelta(hours=8))) if obj.tzinfo is None else obj
+        return stamp.isoformat()
     if obj is m.pd.NaT:
         return None
     if hasattr(obj, 'item'):
@@ -219,9 +222,9 @@ def clean(obj):
     return obj
 
 
-def route_arg(value):
-    if value not in ROUTES:
-        raise ValueError('请选择支持的首都机场出港航线。')
+def airport_arg(value):
+    if value not in AIRPORTS:
+        raise ValueError('当前模型仅支持北京首都机场 PEK。')
     return value
 
 
@@ -235,45 +238,175 @@ def date_arg(value, start='2019-01-01', end='2019-12-31'):
     return day
 
 
-def backtest(route, compare, start, end):
+def backtest(airport, start, end):
     start = date_arg(start)
     end = date_arg(end)
     if start > end:
         raise ValueError('开始日期不能晚于结束日期。')
-    days = TEST.scheduled.dt.strftime('%Y-%m-%d')
-    selected = TEST[days.between(start, end) & TEST.destination.isin([route, compare])].copy()
-    series = []
-    summary = []
-    for code in dict.fromkeys([route, compare]):
-        data = selected[selected.destination == code]
-        if not len(data):
-            summary.append({'route': code, 'n': 0})
-            continue
-        summary.append({
-            'route': code,
-            'n': len(data),
-            'actual_mean': data.arrival_DT.mean(),
-            'predicted_mean': data.predicted_DT.mean(),
-            'mae': (data.arrival_DT - data.predicted_DT).abs().mean(),
-            'delay15': data.arrival_DT.gt(15).mean(),
-            'coverage': data.arrival_DT.between(data.lower, data.upper).mean(),
-        })
-        aggregate = data.groupby(data.scheduled.dt.strftime('%Y-%m-%d')).agg(
-            actual=('arrival_DT', 'mean'), predicted=('predicted_DT', 'mean'), n=('arrival_DT', 'size')
-        )
-        series.append({'route': code, 'points': [{'date': index, **row.to_dict()} for index, row in aggregate.iterrows()]})
-    focus = selected[selected.destination == route].sort_values('scheduled')
-    records = focus[['flight_no', 'destination', 'scheduled', 'scheduled_arrival', 'arrival_DT', 'predicted_DT', 'lower', 'upper']].head(100).to_dict('records')
+    days = TEST.window_start.dt.strftime('%Y-%m-%d')
+    selected = TEST[days.between(start, end) & TEST.airport.eq(airport)].sort_values('window_start').copy()
+    error = selected.predicted_mean_delay - selected.actual_mean_delay
+    summary = {
+        'airport': airport,
+        'window_count': int(len(selected)),
+        'flight_count': int(selected.flight_count.sum()),
+        'mean_flights_per_window': selected.flight_count.mean(),
+        'actual_mean': selected.actual_mean_delay.mean(),
+        'predicted_mean': selected.predicted_mean_delay.mean(),
+        'mae': error.abs().mean(),
+        'rmse': m.np.sqrt(error.pow(2).mean()) if len(selected) else None,
+        'bias': error.mean(),
+        'coverage80': selected.actual_mean_delay.between(selected.lower, selected.upper).mean(),
+        'hours_over_15': selected.actual_mean_delay.gt(15).mean(),
+    }
+    series = selected[[
+        'window_start', 'window_end', 'flight_count', 'actual_mean_delay',
+        'predicted_mean_delay', 'simple_baseline_mean_delay', 'lower', 'upper',
+    ]].to_dict('records')
+    records = selected[[
+        'airport', 'window_start', 'window_end', 'flight_count', 'actual_mean_delay',
+        'predicted_mean_delay', 'simple_baseline_mean_delay', 'lower', 'upper',
+    ]].head(168).to_dict('records')
     return clean({
         'start': start,
         'end': end,
         'summary': summary,
         'series': series,
         'records': records,
-        'record_total': len(focus),
-        'record_limit': 100,
+        'record_total': len(selected),
+        'record_limit': 168,
         'selected_model': META['selected'],
+        'target_scope': 'airport_hour',
+        'horizon_minutes': 60,
     })
+
+
+def validate_event_comparison(asset):
+    """Validate the frozen aggregate event/quiet comparison before serving it."""
+    required = {
+        'scope', 'status', 'airport', 'target', 'classification', 'groups',
+        'difference', 'calendar_adjusted_event_cluster', 'paper_benchmark',
+    }
+    missing = required.difference(asset)
+    if missing:
+        raise ValueError('事件到港对比资产缺少字段：' + ', '.join(sorted(missing)))
+    if asset.get('scope') != 'historical_event_quiet_first_leg_arrival_comparison':
+        raise ValueError('事件到港对比资产 scope 不匹配。')
+    if asset.get('status') != 'historical_exploratory_reanalysis':
+        raise ValueError('事件到港对比资产必须标记为历史探索性再分析。')
+    if asset.get('airport') != 'PEK':
+        raise ValueError('事件到港对比资产机场必须是 PEK。')
+    target = asset.get('target', {})
+    if target.get('unit') != 'physical_departure_first_leg':
+        raise ValueError('事件到港对比资产必须使用物理起飞首段单位。')
+    if target.get('metric') != 'first_leg_arrival_delay_minutes':
+        raise ValueError('事件到港对比资产必须使用首段到港延误指标。')
+    if target.get('threshold_minutes') != 30:
+        raise ValueError('事件到港对比资产的比例阈值必须是 30 分钟。')
+    classification = asset.get('classification', {})
+    if classification.get('event_rows_in_local_period') != 31:
+        raise ValueError('事件到港对比资产必须包含研究期 31 条冻结事件。')
+    if classification.get('independent_event_clusters') != 28:
+        raise ValueError('事件到港对比资产必须包含 28 个合并事件簇。')
+    total = int(classification.get('valid_first_leg_arrivals', -1))
+    partition = sum(int(classification.get(name, -1)) for name in (
+        'quiet_flights', 'event_flights', 'excluded_boundary_or_partial_day_flights'
+    ))
+    if total < 1 or partition != total:
+        raise ValueError('事件到港对比资产的 quiet/event/excluded 样本不守恒。')
+    adjusted = asset.get('calendar_adjusted_event_cluster', {})
+    if adjusted.get('event_cluster_count') != 28:
+        raise ValueError('事件簇调整结果未覆盖全部 28 个事件簇。')
+    for endpoint in ('mean_arrival_delay_minutes', 'arrival_delay_over_30_percentage_points'):
+        estimate = adjusted.get(endpoint, {})
+        ci = estimate.get('ci95', {})
+        if ci.get('samples') != 5000 or ci.get('seed') != 20261029:
+            raise ValueError('两个事件簇 Bootstrap 终点都必须使用 5,000 次与种子 20261029。')
+        try:
+            lower = float(ci['lower'])
+            point = float(estimate['point'])
+            upper = float(ci['upper'])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError('事件簇 Bootstrap 终点缺少有效的点估计或区间。') from exc
+        if not lower <= point <= upper:
+            raise ValueError('事件簇 Bootstrap 点估计必须位于 95% 区间内。')
+    mean_ci = adjusted['mean_arrival_delay_minutes']['ci95']
+    expected_robust = bool(float(mean_ci['lower']) > 0)
+    if bool(adjusted.get('robust_direction_supported')) != expected_robust:
+        raise ValueError('事件层稳健性标志与均值差 95% 区间不一致。')
+
+
+def model_comparison_payload(metadata):
+    """Keep the predictive A/B evidence separate from the historical event study."""
+    validation_a = float(metadata['validation']['baseline']['mae'])
+    validation_b = float(metadata['validation']['space']['mae'])
+    test_a = float(metadata['baseline_model_test']['mae'])
+    test_b = float(metadata['space_model_test']['mae'])
+    production_gates = {
+        key: bool(value)
+        for key, value in metadata.get('production_gates', {}).items()
+    }
+    selected_product_model = metadata.get('selected', 'baseline')
+    space_enabled = bool(
+        selected_product_model == 'space'
+        and production_gates
+        and all(production_gates.values())
+    )
+    conclusion = (
+        '模型 B 已通过历史开发、历史留出、ROTI 时区确认与全新确认段四项生产门槛，当前主预报启用模型 B。'
+        if space_enabled else
+        '事件期对比不等于预测增益。模型 B 的 2019 配对误差区间仍跨 0，ROTI 时区尚未确认，且没有全新确认时段，因此主预报继续固定使用模型 A。'
+    )
+    return {
+        'metric': 'MAE（分钟，越低越好）',
+        'lower_is_better': True,
+        'enable_threshold_relative_percent': 1.0,
+        'model_a_name': '模型 A · 仅时间规律',
+        'model_b_name': '模型 B · 时间规律 + 空间天气',
+        'validation': {
+            'stage_label': '2018 Q3 历史开发评估',
+            'status': 'historical_development',
+            'model_a_mae': validation_a,
+            'model_b_mae': validation_b,
+            'b_relative_improvement_percent': float((validation_a - validation_b) / validation_a * 100),
+            'bootstrap': metadata.get('validation_bootstrap'),
+        },
+        'independent_test': {
+            'stage_label': '2019 历史留出审计',
+            'status': 'historical_holdout',
+            'model_a_mae': test_a,
+            'model_b_mae': test_b,
+            'b_relative_improvement_percent': float((test_a - test_b) / test_a * 100),
+            'bootstrap': metadata.get('test_bootstrap'),
+        },
+        'rolling_folds': metadata.get('rolling_folds', []),
+        'internal_screening_gates': metadata.get('internal_screening_gates', {}),
+        'internal_screening_pass': bool(metadata.get('internal_screening_pass', False)),
+        'historical_holdout_gates': metadata.get('historical_holdout_gates', {}),
+        'production_gates': production_gates,
+        'roti_timezone_status': metadata.get('roti_timezone_status'),
+        'fresh_confirmation_available': bool(metadata.get('fresh_confirmation_available', False)),
+        'space_enabled': space_enabled,
+        'selected_product_model': selected_product_model,
+        'selected_product_mae': metadata.get('test', {}).get('mae'),
+        'selected_reason': metadata.get('selected_reason'),
+        'conclusion': conclusion,
+    }
+
+
+def space_weather_comparison(meta=None, comparison=None):
+    """Return the frozen event/quiet arrival study plus separate A/B evidence."""
+    metadata = META if meta is None else meta
+    asset = EVENT_COMPARISON if comparison is None else comparison
+    if asset is None:
+        asset_path = m.DATA / 'event_arrival_comparison.json'
+        if not asset_path.exists():
+            raise ValueError('缺少事件期—完整安静期到港对比资产。')
+        asset = json.loads(asset_path.read_text(encoding='utf-8'))
+    validate_event_comparison(asset)
+    response = json.loads(json.dumps(asset, ensure_ascii=False))
+    response['model_comparison'] = model_comparison_payload(metadata)
+    return clean(response)
 
 
 def request_rate_ok(ip, method, path):
@@ -311,6 +444,31 @@ def load_historical_space():
         return dst[['abs_dDst_dt_nT_per_h']].join(roti[['ROTI_TECU_per_min']], how='inner')
     LOG.warning('历史空间天气运行数据缺失；自动预测将安全回退到基础模型。')
     return None
+
+
+def validate_assets(meta, model, test):
+    """Fail fast if model, metadata, and test windows do not describe one target."""
+    required_meta = {
+        'asset_id', 'schema_version', 'prediction_unit', 'interval_unit',
+        'primary_metric', 'timezone', 'horizon_minutes', 'airport',
+    }
+    missing = sorted(required_meta.difference(meta))
+    if missing:
+        raise ValueError('metadata.json 缺少机场小时资产字段：' + ', '.join(missing))
+    if meta['prediction_unit'] != 'airport_hour' or meta['interval_unit'] != 'airport_hour':
+        raise ValueError('模型资产不是机场小时口径。')
+    if meta['airport'] != 'PEK' or meta['timezone'] != 'Asia/Shanghai' or meta['horizon_minutes'] != 60:
+        raise ValueError('模型资产的机场、时区或预报窗口不匹配。')
+    if model.get('asset_id') != meta['asset_id'] or model.get('schema_version') != meta['schema_version']:
+        raise ValueError('model.joblib 与 metadata.json 版本不一致。')
+    if test.empty or 'asset_id' not in test or 'schema_version' not in test:
+        raise ValueError('test_windows.pkl 缺少资产标识。')
+    if set(test.asset_id.astype(str)) != {str(meta['asset_id'])}:
+        raise ValueError('测试窗口与模型资产标识不一致。')
+    if set(test.schema_version.astype(int)) != {int(meta['schema_version'])}:
+        raise ValueError('测试窗口与模型资产结构版本不一致。')
+    if set(test.airport.astype(str)) != {'PEK'}:
+        raise ValueError('测试窗口包含不受支持的机场。')
 
 
 class AppServer(ThreadingHTTPServer):
@@ -380,7 +538,7 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         try:
             self.wfile.write(content)
-        except (BrokenPipeError, ConnectionResetError):
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
             pass
 
     def allowed(self):
@@ -482,6 +640,8 @@ class Handler(BaseHTTPRequestHandler):
             if parsed.path == '/api/admin/events':
                 return self.send(200, AUTH.admin_events(max(1, min(100000, int(get('page', '1')))), get('search', '')))
             if parsed.path == '/api/meta':
+                now_local = datetime.now(timezone(timedelta(hours=8)))
+                next_hour = now_local.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
                 return self.send(200, {
                     **META,
                     'csrf': self.auth_session['csrf'],
@@ -492,25 +652,31 @@ class Handler(BaseHTTPRequestHandler):
                     'sharing_mode': bool(PUBLIC_ORIGIN),
                     'public_url': PUBLIC_ORIGIN or None,
                     'registration_enabled': REGISTRATION_ENABLED,
-                    'today': datetime.now(timezone(timedelta(hours=8))).strftime('%Y-%m-%d'),
-                    'tomorrow': (datetime.now(timezone(timedelta(hours=8))) + timedelta(days=1)).strftime('%Y-%m-%d'),
+                    'today': now_local.strftime('%Y-%m-%d'),
+                    'tomorrow': (now_local + timedelta(days=1)).strftime('%Y-%m-%d'),
+                    'next_window_start': next_hour.isoformat(),
                 })
             if parsed.path == '/api/weather':
                 return self.send(200, {'data': weather_view(), 'configured': True})
+            if parsed.path == '/api/space-comparison':
+                return self.send(200, space_weather_comparison())
             if parsed.path in {'/api/backtest', '/api/export'}:
-                route = route_arg(get('route', 'SHA'))
-                compare = route_arg(get('compare', 'CAN'))
+                airport = airport_arg(get('airport', 'PEK'))
                 start = date_arg(get('start', '2019-09-01'))
                 end = date_arg(get('end', '2019-09-30'))
                 if start > end:
                     raise ValueError('开始日期不能晚于结束日期。')
                 if parsed.path == '/api/backtest':
-                    return self.send(200, backtest(route, compare, start, end))
-                days = TEST.scheduled.dt.strftime('%Y-%m-%d')
-                data = TEST[days.between(start, end) & TEST.destination.eq(route)]
-                columns = ['flight_no', 'destination', 'scheduled', 'scheduled_arrival', 'arrival_DT', 'predicted_DT', 'lower', 'upper']
+                    return self.send(200, backtest(airport, start, end))
+                days = TEST.window_start.dt.strftime('%Y-%m-%d')
+                data = TEST[days.between(start, end) & TEST.airport.eq(airport)]
+                columns = [
+                    'airport', 'window_start', 'window_end', 'flight_count',
+                    'actual_mean_delay', 'predicted_mean_delay',
+                    'simple_baseline_mean_delay', 'lower', 'upper',
+                ]
                 csv_text = data[columns].to_csv(index=False)
-                return self.send(200, ('\ufeff' + csv_text).encode('utf-8'), 'text/csv; charset=utf-8', {'Content-Disposition': f'attachment; filename="PEK_{route}_{start}_{end}.csv"'})
+                return self.send(200, ('\ufeff' + csv_text).encode('utf-8'), 'text/csv; charset=utf-8', {'Content-Disposition': f'attachment; filename="{airport}_hourly_{start}_{end}.csv"'})
 
             files = {
                 '/': 'index.html',
@@ -608,16 +774,25 @@ class Handler(BaseHTTPRequestHandler):
                 value, cached = refresh_weather()
                 return self.send(200, {'data': value, 'cached': cached})
             if path == '/api/predict':
-                route = route_arg(obj.get('route', 'SHA'))
-                day = date_arg(obj.get('date'), start='2019-01-01', end='2030-12-31')
-                clock = obj.get('time', '10:00')
+                if 'route' in obj or 'airline' in obj:
+                    raise ValueError('本系统预测机场一小时平均延误，不接受航线或单航班条件。')
+                airport = airport_arg(obj.get('airport', 'PEK'))
+                if obj.get('horizon_minutes', 60) != 60:
+                    raise ValueError('当前模型的预报窗口固定为 60 分钟。')
+                raw_start = obj.get('window_start')
+                if not isinstance(raw_start, str):
+                    raise ValueError('请提供带时区的 window_start。')
                 try:
-                    scheduled = datetime.strptime(day + ' ' + clock, '%Y-%m-%d %H:%M')
+                    aware_start = datetime.fromisoformat(raw_start.replace('Z', '+00:00'))
                 except ValueError:
-                    raise ValueError('起飞时间格式不正确。') from None
-                airline = obj.get('airline', 'CA')
-                if not isinstance(airline, str) or len(airline) != 2 or not airline.isalnum():
-                    raise ValueError('请输入两位航空公司代码。')
+                    raise ValueError('window_start 必须是 ISO 8601 时间。') from None
+                if aware_start.tzinfo is None:
+                    raise ValueError('window_start 必须包含时区；北京时间请使用 +08:00。')
+                local_aware = aware_start.astimezone(timezone(timedelta(hours=8)))
+                if local_aware.minute or local_aware.second or local_aware.microsecond:
+                    raise ValueError('一小时窗口必须从整点开始。')
+                date_arg(local_aware.strftime('%Y-%m-%d'), start='2019-01-01', end='2030-12-31')
+                window_start = local_aware.replace(tzinfo=None)
 
                 def optional(name, low, high):
                     value = obj.get(name)
@@ -633,7 +808,7 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError('空间天气模式不正确。')
                 context = None
                 if mode == 'auto':
-                    context = auto_parameters(scheduled)
+                    context = auto_parameters(window_start)
                     dst = context['dst'] if context['usable'] else None
                     roti = context['roti'] if context['usable'] else None
                 else:
@@ -641,25 +816,23 @@ class Handler(BaseHTTPRequestHandler):
                     roti = optional('roti', 0, 2)
                     if (dst is None) != (roti is None):
                         raise ValueError('情景分析需同时输入 Dst 变化率和 ROTI。')
-                result = m.estimate(MODEL, route, scheduled, airline.upper(), dst, roti)
+                result = m.estimate(MODEL, airport, window_start, dst, roti)
                 return self.send(200, {
                     **result,
-                    'route': route,
-                    'scheduled': scheduled.isoformat(),
                     'mode': 'automatic' if mode == 'auto' else ('scenario' if dst is not None else 'historical_model'),
                     'auto_parameters': context,
                     'outside_space_training': dst is not None and (dst > 48 or roti > .2),
-                    'notice': '历史模型研究估计，不是航空公司发布的预计到达时间。区间为单航班残差校准区间。',
+                    'notice': '历史研究模型给出 PEK 整体一小时平均离港延误；不是单个航班或航线的预计延误。区间按机场小时残差校准。',
                 })
             if path == '/api/live':
-                route = route_arg(obj.get('route', 'SHA'))
+                airport = airport_arg(obj.get('airport', 'PEK'))
                 with LOCK:
-                    cached = FLIGHT_CACHE.get(route)
+                    cached = FLIGHT_CACHE.get(airport)
                 if cached and time.time() - cached[0] < 300:
                     return self.send(200, {**cached[1], 'cached': True})
-                response = attach_forecasts(fetch_route(route, KEY))
+                response = attach_window_forecasts(fetch_airport(KEY))
                 with LOCK:
-                    FLIGHT_CACHE[route] = (time.time(), response)
+                    FLIGHT_CACHE[airport] = (time.time(), response)
                 return self.send(200, response)
             self.send(404, {'error': '接口不存在。'})
         except AuthError as exc:
@@ -674,7 +847,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    global META, MODEL, TEST, WEATHER, FORECASTS, HISTORICAL_SPACE, AUTH, PROXY_SECRET
+    global META, MODEL, TEST, WEATHER, FORECASTS, HISTORICAL_SPACE, EVENT_COMPARISON, AUTH, PROXY_SECRET
     parser = argparse.ArgumentParser()
     parser.add_argument('--host', default=None)
     parser.add_argument('--port', type=int, default=None)
@@ -694,7 +867,7 @@ def main():
     if public_bind and not ALLOWED_HOSTS:
         raise SystemExit('公网监听需要设置 PUBLIC_ORIGIN（推荐）或 ALLOWED_HOSTS。')
 
-    for required in ('metadata.json', 'model.joblib', 'test_flights.pkl'):
+    for required in ('metadata.json', 'model.joblib', 'test_windows.pkl', 'event_arrival_comparison.json'):
         if not (m.DATA / required).exists():
             raise SystemExit(f'缺少运行资产 data/{required}，请先准备模型数据。')
 
@@ -717,7 +890,15 @@ def main():
     PROXY_SECRET = proxy_secret.read_text(encoding='utf-8').strip()
     META = json.loads((m.DATA / 'metadata.json').read_text(encoding='utf-8'))
     MODEL = m.joblib.load(m.DATA / 'model.joblib')
-    TEST = m.pd.read_pickle(m.DATA / 'test_flights.pkl')
+    TEST = m.pd.read_pickle(m.DATA / 'test_windows.pkl')
+    EVENT_COMPARISON = json.loads(
+        (m.DATA / 'event_arrival_comparison.json').read_text(encoding='utf-8')
+    )
+    try:
+        validate_assets(META, MODEL, TEST)
+        validate_event_comparison(EVENT_COMPARISON)
+    except ValueError as exc:
+        raise SystemExit('模型资产校验失败：' + str(exc)) from exc
     HISTORICAL_SPACE = load_historical_space()
 
     saved = root / 'issued_forecasts.json'

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#102f32">
-  <title>航迹 · 航班与空间天气研究系统</title>
+  <title>航迹 · 机场一小时平均延误研究系统</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/style.css">
 </head>
@@ -13,26 +13,27 @@
 <aside class="sidebar">
   <a class="brand" href="/" aria-label="航迹首页">
     <span class="brand-icon" aria-hidden="true">↗</span>
-    <span>航迹<small>FLIGHT OBSERVATORY</small></span>
+    <span>航迹<small>AIRPORT DELAY LAB</small></span>
   </a>
-  <div class="nav-caption">研究工作台</div>
+  <div class="nav-caption">机场研究工作台</div>
   <nav aria-label="主导航">
-    <button class="nav active" data-tab="overview" aria-current="page"><span aria-hidden="true">◫</span><b>航线概览</b></button>
-    <button class="nav" data-tab="forecast"><span aria-hidden="true">↗</span><b>延误预报</b></button>
-    <button class="nav" data-tab="live"><span aria-hidden="true">⇄</span><b>实时航班</b></button>
-    <button class="nav" data-tab="methods"><span aria-hidden="true">◎</span><b>模型与数据</b></button>
+    <button class="nav active" data-tab="overview" aria-current="page"><span aria-hidden="true">◫</span><b>项目概览</b></button>
+    <button class="nav" data-tab="forecast"><span aria-hidden="true">↗</span><b>1 小时预报</b></button>
+    <button class="nav" data-tab="comparison"><span aria-hidden="true">≈</span><b>空间天气对比</b></button>
+    <button class="nav" data-tab="live"><span aria-hidden="true">⇄</span><b>机场数据</b></button>
+    <button class="nav" data-tab="methods"><span aria-hidden="true">◎</span><b>模型与口径</b></button>
   </nav>
   <div class="sidebar-note" id="environment-note">
     <div class="service-line"><span class="signal-dot"></span><strong>研究服务已连接</strong></div>
-    <p>北京站 TEC × 航班运行数据</p>
-    <span>真实历史数据 · 独立年份回测</span>
+    <p>北京首都 PEK × 北京站空间天气</p>
+    <span>机场小时口径 · 历史留出回看</span>
   </div>
-  <div class="sidebar-bottom">SPACE WEATHER × AVIATION<small>让预测与观测相互验证</small></div>
+  <div class="sidebar-bottom">ONE AIRPORT · ONE HOUR<small>先把预测对象说清楚</small></div>
 </aside>
 
 <main id="main-content">
   <header class="topbar">
-    <div class="top-context"><span class="mobile-mark">航迹</span><span>研究工作台</span><span class="slash">/</span><strong id="current-section">航线概览</strong></div>
+    <div class="top-context"><span class="mobile-mark">航迹</span><span>机场研究工作台</span><span class="slash">/</span><strong id="current-section">项目概览</strong></div>
     <div class="top-right">
       <span class="date-chip" id="clock">—</span>
       <a id="admin-link" href="/admin" hidden>管理后台</a>
@@ -47,109 +48,178 @@
     <section class="page active" id="overview" tabindex="-1">
       <div class="page-head hero-head">
         <div>
-          <div class="eyebrow">ROUTE INTELLIGENCE</div>
-          <h1>从空间天气，读懂每一次抵达。</h1>
-          <p>在真实航班记录中比较航线、检验预测，并把误差和边界一起呈现。</p>
+          <div class="eyebrow">AIRPORT 1-HOUR DELAY</div>
+          <h1>预见机场下一小时，而不是猜某一班。</h1>
+          <p>预测 PEK 在一个完整小时窗口内，全部有效出港航班的平均离港延误。</p>
         </div>
-        <button class="button primary" id="go-forecast">生成延误预报 <span aria-hidden="true">↗</span></button>
+        <button class="button primary" id="go-forecast">生成 1 小时预报 <span aria-hidden="true">↗</span></button>
       </div>
 
       <div class="status-rail" aria-label="数据状态">
-        <div><span class="status-icon" aria-hidden="true">01</span><p>历史数据</p><strong>2017—2019 · 已载入</strong></div>
-        <div><span class="status-icon" aria-hidden="true">02</span><p>当前模型</p><strong id="model-status-chip">正在读取…</strong></div>
-        <div><span class="status-icon" aria-hidden="true">03</span><p>空间天气</p><strong id="weather-status-chip">等待自动更新</strong></div>
+        <div><span class="status-icon" aria-hidden="true">01</span><p>预测对象</p><strong>PEK 机场整体</strong></div>
+        <div><span class="status-icon" aria-hidden="true">02</span><p>时间尺度</p><strong>[T, T+1h)</strong></div>
+        <div><span class="status-icon" aria-hidden="true">03</span><p>当前模型</p><strong id="model-status-chip">正在读取…</strong></div>
       </div>
 
-      <div class="banner">
-        <span class="pill teal">独立测试集</span>
-        <span>当前展示 2019 年数据；模型训练没有使用这一年的实际延误。</span>
-        <button data-jump="methods">查看验证方法 →</button>
+      <div class="banner scope-banner">
+        <span class="pill teal">口径已锁定</span>
+        <span><strong>不是单次航班，也不是某条航线。</strong> 主指标按机场一小时窗口等权计算。</span>
+        <button data-jump="methods">查看完整定义 →</button>
+      </div>
+
+      <div class="stats overview-project-stats" id="overview-project-stats" aria-label="项目总体数据">
+        <div class="stat skeleton"></div><div class="stat skeleton"></div><div class="stat skeleton"></div><div class="stat skeleton"></div>
       </div>
 
       <article class="filter-panel">
-        <div class="section-intro"><div><span class="section-kicker">筛选航班</span><h2>比较两条航线的真实表现</h2></div><p>时间范围限于 2019 年独立测试集</p></div>
-        <form class="filters" id="history-form">
-          <label>目标航线<select id="route"><option value="SHA">PEK → SHA · 上海虹桥</option><option value="PVG">PEK → PVG · 上海浦东</option><option value="CAN">PEK → CAN · 广州白云</option><option value="SZX">PEK → SZX · 深圳宝安</option></select></label>
-          <label>对比航线<select id="compare"><option value="CAN">PEK → CAN · 广州白云</option><option value="SHA">PEK → SHA · 上海虹桥</option><option value="PVG">PEK → PVG · 上海浦东</option><option value="SZX">PEK → SZX · 深圳宝安</option></select></label>
+        <div class="section-intro"><div><span class="section-kicker">历史留出期回看</span><h2>检查每一个机场小时</h2></div><p>2019 年历史留出数据 · 北京时间</p></div>
+        <form class="filters airport-filters" id="history-form">
+          <label>机场<select id="airport"><option value="PEK">PEK · 北京首都国际机场</option></select></label>
           <label>开始日期<input id="start" type="date" min="2019-01-01" max="2019-12-31" value="2019-09-01" required></label>
           <label>结束日期<input id="end" type="date" min="2019-01-01" max="2019-12-31" value="2019-09-30" required></label>
-          <button class="button primary" type="submit">更新对比</button>
+          <button class="button primary" type="submit">更新回测</button>
         </form>
-        <div id="history-status" class="status-line" aria-live="polite">正在载入真实数据…</div>
+        <div id="history-status" class="status-line" aria-live="polite">正在载入机场小时数据…</div>
       </article>
 
       <div class="stats" id="stats"><div class="stat skeleton"></div><div class="stat skeleton"></div><div class="stat skeleton"></div><div class="stat skeleton"></div></div>
 
       <div class="dashboard-grid">
         <article class="card trend-card">
-          <div class="card-head"><div><span class="section-kicker">日度趋势</span><h2>预测与实际，逐日对照</h2><p id="chart-description">日平均到港延误 · 分钟</p></div><div class="legend"><span><i class="dot teal-dot"></i>目标实际</span><span><i class="dot orange-dot"></i>模型预测</span><span><i class="dot gray-dot"></i>对比实际</span></div></div>
+          <div class="card-head"><div><span class="section-kicker">小时趋势</span><h2>实际、预报与简单基线</h2><p id="chart-description">PEK 一小时平均离港延误 · 分钟</p></div><div class="legend"><span><i class="dot teal-dot"></i>实际</span><span><i class="dot orange-dot"></i>启用预报</span><span><i class="dot gray-dot"></i>星期×时段基线</span></div></div>
           <div id="history-chart" class="chart" aria-live="polite"></div>
-          <div class="card-foot">DT = 实际到达 − 计划到达；负数表示提前到达。曲线为每日航班平均值，MAE 按单航班计算。</div>
+          <div class="card-foot">每个点是一小时机场窗口；窗口内航班先求平均，再按窗口等权计算 MAE。提前离港保留负值。</div>
         </article>
-        <article class="card route-card">
-          <div class="card-head"><div><span class="section-kicker">路线快照</span><h2>航线对照</h2></div><span class="tiny">同一时期</span></div>
-          <div class="journey"><div><span>出发机场</span><strong>PEK</strong><small>北京首都</small></div><div class="journey-line"><span aria-hidden="true">✈</span></div><div><span>目的机场</span><strong id="dest-code">SHA</strong><small id="dest-name">上海虹桥</small></div></div>
-          <div id="route-comparison"></div>
-          <p class="subtle">航线差异还受时刻、航司与地面天气影响，不能直接归因于空间天气。</p>
+        <article class="card scope-card">
+          <div class="card-head"><div><span class="section-kicker">预测契约</span><h2>这一条结果代表什么</h2></div><span class="pill teal">PEK ONLY</span></div>
+          <div class="scope-lock"><strong>PEK</strong><span>北京首都国际机场</span></div>
+          <div class="scope-stack">
+            <div><small>窗口</small><b>[T, T + 60 min)</b></div>
+            <div><small>目标</small><b>平均离港延误</b></div>
+            <div><small>单位</small><b>分钟 / 机场小时</b></div>
+          </div>
+          <p class="subtle">当前数据只能覆盖 PEK 全部目的地的出港记录，不能据此声称支持其他机场、单航班或单航线。</p>
         </article>
       </div>
 
       <article class="card table-card">
-        <div class="card-head"><div><span class="section-kicker">逐班记录</span><h2>回到每一班航班</h2><p id="table-caption">真实到达记录与测试集预测</p></div><button class="button secondary" id="export">下载当前航线 CSV</button></div>
-        <div class="table-hint">表格可横向滚动查看完整字段</div>
-        <div class="table-wrap"><table><thead><tr><th>航班</th><th>计划出发 · 北京时间</th><th>实际 DT</th><th>预测 DT</th><th>80% 校准区间</th><th>绝对误差</th></tr></thead><tbody id="history-rows"></tbody></table></div>
+        <div class="card-head"><div><span class="section-kicker">逐小时记录</span><h2>回到每一个机场窗口</h2><p id="table-caption">真实小时均值与测试集预报</p></div><button class="button secondary" id="export">下载小时级 CSV</button></div>
+        <div class="table-hint">表格可横向滚动；最多显示前 168 个窗口，下载包含全部筛选结果</div>
+        <div class="table-wrap"><table><thead><tr><th>机场</th><th>窗口 · 北京时间</th><th>有效航班数</th><th>实际平均延误</th><th>预报平均延误</th><th>80% 小时区间</th><th>绝对误差</th></tr></thead><tbody id="history-rows"></tbody></table></div>
       </article>
     </section>
 
     <section class="page" id="forecast" tabindex="-1">
       <div class="page-head">
-        <div><div class="eyebrow">DELAY OUTLOOK</div><h1>给一趟航班，留出时间余量。</h1><p>输入航线与计划出发时间，获得研究性延误估计和不确定区间。</p></div>
+        <div><div class="eyebrow">AIRPORT 1-HOUR OUTLOOK</div><h1>预测 PEK 下一小时的平均离港延误。</h1><p>输入机场小时的起点，结果覆盖该整点起 60 分钟内符合口径的有效离港航班。</p></div>
         <span class="pill amber">历史模型 · 当前年份未验证</span>
       </div>
       <div class="forecast-grid">
         <article class="card form-card">
-          <div class="card-head"><div><span class="step-badge">步骤 1</span><h2>设置航班条件</h2></div><span class="tiny">全部时间为北京时间</span></div>
+          <div class="card-head"><div><span class="step-badge">步骤 1</span><h2>设置机场小时</h2></div><span class="tiny">北京时间 · 整点开始</span></div>
           <form id="predict-form" class="form-stack">
-            <label>航线<select id="forecast-route"><option value="SHA">北京首都 PEK → 上海虹桥 SHA</option><option value="PVG">北京首都 PEK → 上海浦东 PVG</option><option value="CAN">北京首都 PEK → 广州白云 CAN</option><option value="SZX">北京首都 PEK → 深圳宝安 SZX</option></select></label>
-            <div class="form-row"><label>计划出发日期<input type="date" id="forecast-date" min="2019-01-01" max="2030-12-31" required></label><label>计划出发时间<input type="time" id="forecast-time" value="10:00" required></label></div>
-            <label>航空公司代码<select id="airline"><option value="CA">CA · 中国国际航空</option><option value="MU">MU · 中国东方航空</option><option value="CZ">CZ · 中国南方航空</option><option value="HU">HU · 海南航空</option><option value="ZH">ZH · 深圳航空</option></select></label>
-            <div class="auto-weather-note"><span class="pill teal">默认自动匹配</span><p>历史日期会匹配起飞前 Dst 与 ROTI；未来缺少实时 ROTI 时，系统安全回退到基础航班模型。</p><span id="auto-weather-status" role="status">正在检查空间天气数据…</span></div>
+            <label>机场<select id="forecast-airport"><option value="PEK">PEK · 北京首都国际机场</option></select></label>
+            <div class="form-row"><label>窗口日期<input type="date" id="forecast-date" min="2019-01-01" max="2030-12-31" required></label><label>窗口起始时间<input type="time" id="forecast-time" step="3600" value="10:00" required></label></div>
+            <div class="fixed-horizon"><span>预报时域</span><strong>60 分钟</strong><small>[T, T+1h)</small></div>
+            <div class="auto-weather-note"><span class="pill teal">默认自动匹配</span><p>历史窗口匹配预报前已完成的 Dst 与 ROTI；未来 ROTI 不可用时，安全回退到已验证的非空间天气模型。</p><span id="auto-weather-status" role="status">正在检查空间天气数据…</span></div>
             <label class="check-label"><input type="checkbox" id="scenario">使用手动空间天气情景（实验功能）</label>
-            <div id="scenario-fields" hidden><div class="form-row"><label>|dDst/dt|（nT/h）<input type="number" id="scenario-dst" min="0" max="200" step="0.1" value="3"></label><label>ROTI（TECU/min）<input type="number" id="scenario-roti" min="0" max="2" step="0.001" value="0.05"></label></div><p class="subtle">这是你指定的情景，不是未来观测；系统不会用零值冒充缺测。</p></div>
-            <button class="button primary wide" type="submit">计算延误估计 <span aria-hidden="true">↗</span></button>
+            <div id="scenario-fields" hidden><div class="form-row"><label>|dDst/dt|（nT/h）<input type="number" id="scenario-dst" min="0" max="200" step="0.1" value="3"></label><label>ROTI（TECU/min）<input type="number" id="scenario-roti" min="0" max="2" step="0.001" value="0.05"></label></div><p class="subtle">这是人为指定的情景，不是未来观测；系统不会用零值冒充缺测。</p></div>
+            <button class="button primary wide" type="submit">计算机场小时预报 <span aria-hidden="true">↗</span></button>
           </form>
         </article>
         <article class="forecast-result" id="prediction-result" aria-live="polite">
-          <span class="eyebrow">ARRIVAL DELAY</span><div class="empty-symbol" aria-hidden="true">↗</div><h2>结果会显示在这里</h2><p>选择航线和时刻后，系统会同时给出估计值、误差范围和适用边界。</p>
+          <span class="eyebrow">MEAN DEPARTURE DELAY</span><div class="empty-symbol" aria-hidden="true">60</div><h2>结果会显示在这里</h2><p>系统会给出机场一小时平均延误、小时级校准区间、历史典型航班量和适用边界。</p>
         </article>
       </div>
       <article class="card weather-card">
         <div class="card-head"><div><span class="section-kicker">环境观测</span><h2>自动空间天气监测</h2><p>NOAA SWPC / Kyoto · 页面可见期间每 5 分钟检查一次</p></div><button class="button secondary" id="weather-refresh">更新空间天气</button></div>
         <div id="weather-data" class="weather-body"><div class="inline-loading"><span></span>正在自动获取公开空间天气参数…</div></div>
-        <div class="card-foot">Dst 与 Kp 描述环境状态；Kp 预报尚未作为模型特征。北京站实时 ROTI 缺测时使用基础模型。</div>
+        <div class="card-foot">Dst 与 Kp 是环境观测；Kp 预报尚未作为模型特征。北京站实时 ROTI 缺测时不会被零值或 Kp 替代。</div>
       </article>
     </section>
 
-    <section class="page" id="live" tabindex="-1">
-      <div class="page-head"><div><div class="eyebrow">OBSERVATION VS FORECAST</div><h1>追踪一条航线，核对每次到达。</h1><p>把服务商的当前航班记录与本地模型估计并排查看。</p></div><span class="pill amber" id="live-badge">等待数据源连接</span></div>
-      <article class="card connection-card"><div><span class="section-kicker">可选数据源</span><h2>连接实时航班服务</h2><p id="connection-note">Aviationstack 官方接口。密钥只保留在本次本地服务内存中，接口权限取决于你的套餐。</p></div><form id="key-form"><label class="sr-only" for="api-key">Aviationstack API 密钥</label><input id="api-key" type="password" autocomplete="off" placeholder="输入 Aviationstack API 密钥"><button class="button secondary" type="submit">连接</button></form></article>
-      <div class="live-controls"><label>要抓取的航线<select id="live-route"><option value="SHA">PEK → SHA · 上海虹桥</option><option value="PVG">PEK → PVG · 上海浦东</option><option value="CAN">PEK → CAN · 广州白云</option><option value="SZX">PEK → SZX · 深圳宝安</option></select></label><button class="button primary" id="fetch-live">抓取航班并对比</button><p class="subtle">按需抓取 · 5 分钟缓存 · 每次最多 100 条</p></div>
-      <div id="live-status" role="status" class="status-line"></div>
-      <article class="card"><div class="card-head"><div><span class="section-kicker">实时结果</span><h2>航班追踪记录</h2></div><span class="tiny" id="live-time">未抓取</span></div><div id="live-content" class="empty-state"><span aria-hidden="true">⇄</span><h3>等待真实航班数据</h3><p>配置数据源后即可抓取选定航线；没有密钥时，历史回测和延误估计仍可正常使用。</p><button class="button secondary" data-jump="overview">查看历史航线对比 →</button></div></article>
-    </section>
+    <section class="page" id="comparison" tabindex="-1">
+      <div class="page-head comparison-head">
+        <div>
+          <div class="eyebrow">SPACE WEATHER COMPARISON</div>
+          <h1>比较事件期与完整安静期，而不是挑选高低分位。</h1>
+          <p>按论文附录冻结的空间天气事件时刻，比较 PEK 始发物理航班的首段到港分布；结果描述总体关联，不解释某一班或某条航线。</p>
+        </div>
+        <span class="pill teal">总体统计 · 非个案因果</span>
+      </div>
 
-    <section class="page" id="methods" tabindex="-1">
-      <div class="page-head"><div><div class="eyebrow">EVIDENCE & LIMITS</div><h1>不仅看曲线，更要看证据。</h1><p>公开数据口径、时间切分和误差，让每一项预测都可检查。</p></div></div>
-      <div class="stats" id="model-stats"></div>
-      <article class="card"><div class="card-head"><div><span class="section-kicker">验证流程</span><h2>按时间推进，独立验证</h2></div><span class="pill teal">无随机混洗切分</span></div><div id="split-timeline" class="split-timeline"></div><div class="card-foot">模型只使用计划航班信息与滞后的环境指标；实际到达、实际离港、当天最终平均延误均不作为输入。</div></article>
-      <article class="card table-card"><div class="card-head"><div><span class="section-kicker">逐航线指标</span><h2>空间天气指标带来了多少提升？</h2><p>独立测试集 · MAE 越小越好</p></div></div><div class="table-hint">表格可横向滚动查看完整指标</div><div class="table-wrap"><table><thead><tr><th>航线</th><th>测试航班数</th><th>基础模型 MAE</th><th>空间天气模型 MAE</th><th>启用模型 MAE</th><th>80% 区间实测覆盖率</th></tr></thead><tbody id="model-rows"></tbody></table></div><p id="selection-note" class="card-foot"></p></article>
-      <div class="method-grid">
-        <article class="card prose"><span class="section-kicker">定义与来源</span><h2>口径与论文对照</h2><p>本系统 DT 采用到港延误，提前到达保留负值；取消航班不进入延误时长模型。</p><p>环境特征使用计划起飞所在 UTC 小时之前 2 个小时标签的 Dst 变化率与北京站 ROTI，避免读取起飞后才完成的整小时观测。</p><p>现有 ROTI 是逐 GPS 卫星 5 分钟标准差的小时均值；这里采用独立验证评估实用性，不宣称复现论文。</p><a href="https://www.nature.com/articles/s41598-023-30424-2" target="_blank" rel="noreferrer">查看原始延误研究 ↗</a></article>
-        <article class="card prose"><span class="section-kicker">正确使用</span><h2>这份预报的适用边界</h2><ul id="limitations"></ul><p>估计值是条件中位数。80% 预测区间来自单航班绝对残差校准，不是平均值置信区间。</p><div class="source-links"><a href="https://services.swpc.noaa.gov/products/kyoto-dst.json" target="_blank" rel="noreferrer">NOAA 数据源 ↗</a><a href="https://aviationstack.com/faq" target="_blank" rel="noreferrer">航班接口说明 ↗</a></div></article>
+      <div class="logic-flow" aria-label="分析流程">
+        <div><span>01</span><strong>确定首段到港</strong><small>每次物理起飞只计一次</small></div>
+        <i aria-hidden="true">→</i>
+        <div><span>02</span><strong>冻结事件时刻</strong><small>31 条事件 · 24 小时窗</small></div>
+        <i aria-hidden="true">→</i>
+        <div><span>03</span><strong>比较总体指标</strong><small>到港均值与 ≥30 分钟比例</small></div>
+        <i aria-hidden="true">→</i>
+        <div><span>04</span><strong>检查事件层稳定性</strong><small>28 个事件簇等权</small></div>
+      </div>
+
+      <article class="card evidence-card paper-evidence">
+        <div class="card-head">
+          <div><span class="section-kicker">已发表研究 · 论文样本</span><h2>五大枢纽机场：空间天气事件期的到达延误分布发生变化</h2><p>Scientific Reports 2023 · 中国五个机场 · 约 400 万条航班记录</p></div>
+          <a class="source-button" href="https://www.nature.com/articles/s41598-023-30424-2" target="_blank" rel="noopener noreferrer">查看论文来源 ↗</a>
+        </div>
+        <div class="paper-metrics" id="paper-comparison">
+          <div class="inline-loading"><span></span>正在读取论文对比指标…</div>
+        </div>
+        <div class="card-foot"><strong>口径提醒：</strong>论文覆盖五个机场和 2015—2019 年；本站只复用事件定义，对 2017—2019 年 PEK 始发首段独立复算。样本范围和首段清洗不同，数值不可直接混算。</div>
+      </article>
+
+      <div id="comparison-status" class="status-line comparison-status" aria-live="polite">正在读取 2017—2019 年事件期—完整安静期对比…</div>
+
+      <div class="comparison-section-head">
+        <div><span class="section-kicker">本站数据 · 历史探索性再分析</span><h2>PEK 始发首段：事件期与完整安静期</h2></div>
+        <span class="pill amber">事件簇稳健性优先 · 不是因果检验</span>
+      </div>
+      <div class="stats" id="comparison-stats"><div class="stat skeleton"></div><div class="stat skeleton"></div><div class="stat skeleton"></div><div class="stat skeleton"></div></div>
+      <div class="comparison-groups">
+        <article class="card group-card" id="calm-summary"><div class="inline-loading"><span></span>正在汇总平静期…</div></article>
+        <article class="card group-card active-group" id="active-summary"><div class="inline-loading"><span></span>正在汇总事件期…</div></article>
+      </div>
+      <article class="card table-card comparison-table-card">
+        <div class="card-head"><div><span class="section-kicker">同口径对照</span><h2>首段到港指标与事件层稳健性</h2><p>原始航班记录差异、30 分钟比例、分布检验和事件簇等权区间必须同时展示</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>指标</th><th>完整安静期</th><th>空间天气事件期</th><th>事件期 − 安静期</th></tr></thead><tbody id="comparison-rows"><tr><td colspan="4">正在计算…</td></tr></tbody></table></div>
+        <p id="comparison-threshold-note" class="card-foot">事件分组复用论文附录定义；到港首段和不确定性由本站数据重新计算。</p>
+      </article>
+
+      <article class="card model-comparison-card">
+        <div class="card-head"><div><span class="section-kicker">预报价值检验</span><h2>模型 A 与模型 B：加入空间天气后是否更准确？</h2><p>MAE 越小越好；2018 Q3 是历史开发评估，2019 是历史留出审计，两者都不是全新确认段</p></div><span class="pill light" id="space-model-verdict">正在读取…</span></div>
+        <div class="table-wrap"><table><thead><tr><th>数据阶段</th><th>模型 A · 仅时间规律</th><th>模型 B · 时间规律 + 空间天气</th><th>B 相对 A</th></tr></thead><tbody id="model-comparison-rows"><tr><td colspan="4">正在读取…</td></tr></tbody></table></div>
+        <div class="finding-callout" id="model-comparison-conclusion">正在评估空间天气信息是否带来稳定的历史留出增益…</div>
+      </article>
+
+      <div class="method-grid comparison-boundaries">
+        <article class="card prose"><span class="section-kicker">可以据此说什么</span><h2>同时看航班记录差异和事件层稳定性</h2><p id="comparison-interpretation">先比较事件期与完整安静期的总体到港分布，再用事件簇等权区间判断结论是否被少数事件支配。</p></article>
+        <article class="card prose"><span class="section-kicker">不能据此说什么</span><h2>不做单航班、航线或因果断言</h2><ul id="comparison-limitations"><li>总体差异不意味着每次空间天气事件都会增加延误。</li><li>结果不能直接用于判断某个航班、某条航线或某架飞机。</li><li>地面天气、流量和运行保障等混杂因素仍需继续控制。</li></ul></article>
       </div>
     </section>
 
-    <footer><span>航迹 · 航班与空间天气研究系统</span><span>仅供科研分析；实时航班状态请以航司与机场发布为准。</span></footer>
+    <section class="page" id="live" tabindex="-1">
+      <div class="page-head"><div><div class="eyebrow">AIRPORT FEED COVERAGE</div><h1>先核对覆盖，再解读机场平均值。</h1><p>Aviationstack 数据按 PEK 全目的地抓取并按小时聚合；分页不完整时只显示“样本均值”。</p></div><span class="pill amber" id="live-badge">等待数据源连接</span></div>
+      <article class="card connection-card"><div><span class="section-kicker">可选数据源</span><h2>连接机场航班服务</h2><p id="connection-note">API 密钥仅用于服务器端请求。接口套餐、分页与实际离港字段会影响覆盖程度。</p></div><form id="key-form"><label class="sr-only" for="api-key">Aviationstack API 密钥</label><input id="api-key" type="password" autocomplete="off" placeholder="输入 Aviationstack API 密钥"><button class="button secondary" type="submit">连接</button></form></article>
+      <div class="live-controls"><label>机场<select id="live-airport"><option value="PEK">PEK · 北京首都国际机场</option></select></label><button class="button primary" id="fetch-live">抓取并聚合机场数据</button><p class="subtle">按需抓取 · 5 分钟缓存 · 不输出单航班预测</p></div>
+      <div id="live-status" role="status" class="status-line"></div>
+      <article class="card"><div class="card-head"><div><span class="section-kicker">机场小时结果</span><h2>数据覆盖与聚合值</h2></div><span class="tiny" id="live-time">未抓取</span></div><div id="live-content" class="empty-state"><span aria-hidden="true">⇄</span><h3>等待机场级数据</h3><p>配置数据源后可检查 PEK 返回记录的分页完整性和每小时实际离港覆盖。</p><button class="button secondary" data-jump="overview">查看历史机场回测 →</button></div></article>
+    </section>
+
+    <section class="page" id="methods" tabindex="-1">
+      <div class="page-head"><div><div class="eyebrow">EVIDENCE & LIMITS</div><h1>模型先服从口径，再谈精度。</h1><p>所有训练、历史开发评估、区间校准和历史留出审计都在“机场一小时窗口”层面完成。</p></div></div>
+      <div class="stats" id="model-stats"></div>
+      <article class="card"><div class="card-head"><div><span class="section-kicker">时间推进流程</span><h2>训练、开发、校准、历史留出</h2></div><span class="pill teal">无随机混洗切分</span></div><div id="split-timeline" class="split-timeline"></div><div class="card-foot">窗口标签在该小时结束后才形成；模型 B 只使用预报窗口开始前已经完成的 Dst 变化率与 ROTI 小时，缺测时逐窗口回退模型 A。</div></article>
+      <article class="card table-card"><div class="card-head"><div><span class="section-kicker">机场小时指标</span><h2>用同一目标公平比较 A/B</h2><p>2019 历史留出审计 · MAE 越小越好 · 每个机场小时等权</p></div></div><div class="table-hint">不要把 1 小时窗口 MAE 与单航班 MAE 或 3 小时平均 MAE 混用</div><div class="table-wrap"><table><thead><tr><th>机场</th><th>留出窗口</th><th>平均航班/窗口</th><th>模型 A · 仅时间</th><th>模型 B · 时间 + 空间天气</th><th>当前启用结果</th><th>80% 区间覆盖率</th></tr></thead><tbody id="model-rows"></tbody></table></div><p id="selection-note" class="card-foot"></p></article>
+      <div class="method-grid">
+        <article class="card prose"><span class="section-kicker">公平嵌套设计</span><h2>模型 A：只考虑时间规律</h2><p>模型 A 对训练期每个“星期 × 小时”组合计算历史机场小时平均延误的中位数。它回答的是：在没有空间天气信息时，这个星期与时段通常延误多少。</p><h2>模型 B：时间规律 + 空间天气</h2><p>模型 B 完整保留模型 A，再用梯度提升树学习剩余误差与滞后 Dst 变化率、ROTI 的关系，并用权重 α=0.75 收缩修正。若 α=0，模型 B 严格退化为模型 A。</p></article>
+        <article class="card prose"><span class="section-kicker">生产启用规则</span><h2>不是“开发期更好”就直接上线</h2><p>模型 B 必须同时通过四项硬门槛：历史开发内部筛查、2019 历史留出稳定性、ROTI 时区确认、全新确认时间段。任一项不通过，主预报都使用模型 A。</p><p>当前只有历史开发内部筛查通过；2019 的 B-A 误差区间跨过 0，且另外两项外部条件未满足。因此模型 B 只作为研究情景展示，不替代生产结果。</p></article>
+        <article class="card prose"><span class="section-kicker">定义与来源</span><h2>机场一小时平均离港延误</h2><p>窗口采用北京时间计划离港时刻：[T, T+1h)。先对窗口内唯一、非取消且有有效实际离港时间的航班计算离港时差，再取算术平均。</p><p>离港时差 = 实际出发 − 计划出发；提前出发保留负值。可识别的共享航班与经停重复记录先合并，每个建模窗口至少 5 班。</p><p>当前只使用 PEK 数据。北京站 ROTI 是首都机场邻域代理，不会被赋给其他机场。</p></article>
+        <article class="card prose"><span class="section-kicker">时间尺度</span><h2>为什么这里是 1 小时</h2><p>国际系统常见 3 小时机场平均延误，曲线通常更平滑；本系统选择 1 小时作为更细的研究目标。</p><p>1 小时与 3 小时的样本量、波动和误差难度不同，因此不直接横向比较 MAE。若增加 3 小时产品，应重新按航班数加权聚合并单独校准。</p><ul id="limitations"></ul><p>80% 区间来自机场小时残差校准，不是单航班区间，也不是因果置信区间。</p></article>
+      </div>
+    </section>
+
+    <footer><span>航迹 · 机场一小时平均延误研究系统</span><span>仅供科研分析；实时运行信息请以机场与航空公司发布为准。</span></footer>
   </div>
 </main>
 <div id="toast" role="status" aria-live="polite" hidden></div>

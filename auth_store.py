@@ -10,7 +10,7 @@ import sqlite3
 import time
 import unicodedata
 
-PROJECT_NAME='航迹｜航班与空间天气研究系统'
+PROJECT_NAME='航迹｜机场一小时平均延误研究系统'
 ITERATIONS=600000
 SESSION_SECONDS=12*3600
 REMEMBER_SECONDS=30*24*3600

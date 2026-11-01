@@ -1,0 +1,196 @@
+{
+  "schema_version": 1,
+  "scope": "historical_event_quiet_first_leg_arrival_comparison",
+  "status": "historical_exploratory_reanalysis",
+  "airport": "PEK",
+  "timezone_assumption": "源航班时刻统一按 UTC+08 解释",
+  "period": {
+    "start": "2017-01-01",
+    "end": "2019-12-31"
+  },
+  "target": {
+    "unit": "physical_departure_first_leg",
+    "metric": "first_leg_arrival_delay_minutes",
+    "definition": "每次 PEK 物理起飞的第一停靠站实际到港减计划到港",
+    "scope_note": "表示 PEK 计划离港队列的下游首段到港结果；不是到达 PEK 的入港航班，也不是任何单个航班或航线的预测。",
+    "threshold_minutes": 30
+  },
+  "source": {
+    "flight_cache": {
+      "file": "flights_peK_raw_cache.pkl",
+      "sha256": "7EAEB843AA7ABFB73699C7BF32789D3A3C7400293616CC7901AF77195FE1D556"
+    },
+    "event_table": {
+      "file": "space_weather_events_2017_2019.csv",
+      "sha256": "3644230E06EC8F950B7DCDF6CFE2DE0601418B88C630597C01E4715FCDB5B600",
+      "doi": "10.1038/s41598-023-30424-2",
+      "article_url": "https://www.nature.com/articles/s41598-023-30424-2",
+      "supplement_url": "https://static-content.springer.com/esm/art%3A10.1038%2Fs41598-023-30424-2/MediaObjects/41598_2023_30424_MOESM1_ESM.pdf",
+      "note": "事件时刻逐行转录自论文 Supplementary Information Table A。"
+    }
+  },
+  "classification": {
+    "method": "Table A 事件有效起点后 24 小时；CME 先补偿 30 分钟；实际首段飞行区间与事件窗相交为事件样本；完整无事件自然日为安静样本",
+    "paper_definition_reused": true,
+    "event_duration_hours": 24,
+    "cme_compensation_minutes": 30,
+    "event_rows_in_local_period": 31,
+    "event_type_counts": {
+      "CME": 21,
+      "SF": 7,
+      "SEP": 3
+    },
+    "independent_event_clusters": 28,
+    "valid_first_leg_arrivals": 863738,
+    "quiet_flights": 816230,
+    "event_flights": 24956,
+    "excluded_boundary_or_partial_day_flights": 22552,
+    "quiet_complete_departure_days": 1038,
+    "event_departure_days": 70
+  },
+  "groups": {
+    "quiet": {
+      "label": "完整安静期",
+      "flight_count": 816230,
+      "actual_departure_day_count": 1038,
+      "mean_delay_minutes": 4.328792129669333,
+      "median_delay_minutes": -9.0,
+      "standard_deviation_minutes": 55.82743261084066,
+      "p90_delay_minutes": 48.0,
+      "arrival_delay_over_30_rate": 0.1444654080345001
+    },
+    "event": {
+      "label": "空间天气事件期",
+      "flight_count": 24956,
+      "actual_departure_day_count": 70,
+      "mean_delay_minutes": 11.44157717582946,
+      "median_delay_minutes": -9.0,
+      "standard_deviation_minutes": 72.72023054319446,
+      "p90_delay_minutes": 71.0,
+      "arrival_delay_over_30_rate": 0.18135919217823368
+    }
+  },
+  "difference": {
+    "direction": "event_minus_quiet",
+    "mean_arrival_delay_minutes": {
+      "point": 7.112785046160127,
+      "relative_percent": 164.31338888761695
+    },
+    "arrival_delay_over_30_percentage_points": 3.6893784143733592,
+    "cohens_d": 0.1261099600400379,
+    "distribution_test": {
+      "name": "two-sample Kolmogorov-Smirnov",
+      "alternative": "two-sided",
+      "statistic": 0.03785733358593946,
+      "p_value": 1.3665668106526244e-30,
+      "p_value_text": "1.367e-30",
+      "sample_unit": "首段航班记录",
+      "caveat": "航班记录并非独立空间天气事件；该检验只说明经验分布可区分，稳健性以事件簇 Bootstrap 为主。"
+    }
+  },
+  "calendar_adjusted_event_cluster": {
+    "method": "安静组按年×月×星期×计划到港小时建立参照；事件航班减参照后，先在事件簇内航班等权，再在事件簇间等权",
+    "strata": [
+      "年",
+      "月",
+      "星期",
+      "计划到港小时（UTC+8 假设）"
+    ],
+    "event_flights_total": 24956,
+    "event_flights_matched": 24956,
+    "event_flights_excluded_no_quiet_reference": 0,
+    "matched_coverage": 1.0,
+    "event_cluster_count": 28,
+    "mean_arrival_delay_minutes": {
+      "point": 4.300862052413295,
+      "ci95": {
+        "lower": -3.3938992284054015,
+        "median": 3.929618962130837,
+        "upper": 14.08292264469018,
+        "samples": 5000,
+        "seed": 20261029,
+        "method": "28 个事件簇等权、有放回整块重抽的百分位 Bootstrap"
+      },
+      "positive_event_clusters": 14,
+      "negative_event_clusters": 14,
+      "zero_event_clusters": 0,
+      "leave_one_event_out_min": 0.6780433059381229,
+      "leave_one_event_out_max": 5.541089463328254
+    },
+    "arrival_delay_over_30_percentage_points": {
+      "point": 1.1334149111942136,
+      "ci95": {
+        "lower": -2.578153257476419,
+        "median": 1.1054061232716774,
+        "upper": 5.227025503113829,
+        "samples": 5000,
+        "seed": 20261029,
+        "method": "28 个事件簇等权、有放回整块重抽的百分位 Bootstrap"
+      }
+    },
+    "flight_weighted_diagnostic": {
+      "mean_arrival_delay_minutes": 3.0269781485346052,
+      "arrival_delay_over_30_percentage_points": 0.3988362067114612,
+      "note": "仅作构成诊断；正式调整估计量为事件簇等权。"
+    },
+    "robust_direction_supported": false
+  },
+  "data_quality": {
+    "source_records": 968285,
+    "pek_records": 968285,
+    "cancelled_records": 23216,
+    "unusable_scheduled_first_leg_rows": 135,
+    "scheduled_first_leg_candidate_rows": 944934,
+    "physical_departures_with_schedule_candidate": 874914,
+    "physical_departures_with_multiple_rows": 69979,
+    "physical_departures_with_multiple_destinations": 69567,
+    "shortest_duration_tie_groups": 318,
+    "first_legs_missing_actual_time": 10670,
+    "first_legs_invalid_actual_duration": 427,
+    "first_legs_early_arrival_outliers": 79,
+    "valid_first_leg_arrivals": 863738,
+    "valid_first_leg_coverage_of_physical_departures": 0.9872261730867262,
+    "scheduled_duration_rule_minutes": [
+      30,
+      1440
+    ],
+    "actual_duration_rule_minutes": [
+      20,
+      1440
+    ],
+    "minimum_arrival_delay_minutes": -120,
+    "first_leg_selection": "同一物理起飞选择最短合理计划航程；并列时按目的机场、航班号、源顺序稳定排序"
+  },
+  "conclusion": "航班记录层面的到港延误分布可以区分，但日历调整后的事件簇等权 95% 区间跨过 0；因此事件层证据尚不稳定，不能仅凭较小的航班级 p 值宣称稳健显著。",
+  "limitations": [
+    "主预测目标仍是一小时平均离港延误；本页到港结果只是次要历史探索性对比。",
+    "原始数据全部为 PEK 始发记录；本结果不是到达 PEK 的入港航班延误。",
+    "第一停靠站由最短合理计划航程推断，原始表没有显式第一航段标志。",
+    "事件期和安静期还可能受到地面天气、流量、管制、年份与航线构成等混杂。",
+    "航班级 KS 的小 p 值不代表 28 个事件簇上的效应稳定，也不代表因果关系。",
+    "事件期差异不能替代模型 B 的全新时间外预测增益与生产启用门槛。"
+  ],
+  "paper_benchmark": {
+    "title": "Additional flight delays and magnetospheric–ionospheric disturbances during solar storms",
+    "url": "https://www.nature.com/articles/s41598-023-30424-2",
+    "year": 2023,
+    "journal": "Scientific Reports",
+    "sample": {
+      "airports": 5,
+      "flight_records_approx": 4000000,
+      "country": "中国"
+    },
+    "mean_arrival_delay_minutes": {
+      "calm": 9.11,
+      "active": 16.52,
+      "difference": 7.41,
+      "relative_increase_percent": 81.34
+    },
+    "arrival_delay_over_30_rate": {
+      "calm": 0.1776,
+      "active": 0.2157,
+      "difference_percentage_points": 3.81
+    },
+    "note": "论文覆盖五个机场和 2015—2019 年；本站只复用事件定义，并对 2017—2019 PEK 始发首段数据独立复算，数值不可直接混算。"
+  }
+}

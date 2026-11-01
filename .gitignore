@@ -1,5 +1,6 @@
 .deps/
 .venv/
+.demo-state/
 __pycache__/
 *.py[cod]
 *.zip

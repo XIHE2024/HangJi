@@ -1,5 +1,6 @@
 .deps
 .venv
+.demo-state
 __pycache__
 *.pyc
 *.pyo
@@ -15,6 +16,8 @@ share_gateway.py
 test_*.py
 data/*
 !data/model.joblib
-!data/test_flights.pkl
+!data/test_windows.pkl
 !data/metadata.json
 !data/historical_space.csv.gz
+!data/event_arrival_comparison.json
+!data/space_weather_events_2017_2019.csv
