@@ -436,12 +436,13 @@ def load_historical_space():
     if bundled.exists():
         frame = m.pd.read_csv(bundled, parse_dates=['hour_utc']).set_index('hour_utc')
         return frame[['abs_dDst_dt_nT_per_h', 'ROTI_TECU_per_min']]
-    dst_file = m.SOURCE / 'dst_hourly.csv'
-    roti_file = m.SOURCE / 'roti_hourly.csv'
-    if dst_file.exists() and roti_file.exists():
-        dst = m.pd.read_csv(dst_file, parse_dates=['hour_utc']).set_index('hour_utc')
-        roti = m.pd.read_csv(roti_file, parse_dates=['hour_utc']).set_index('hour_utc')
-        return dst[['abs_dDst_dt_nT_per_h']].join(roti[['ROTI_TECU_per_min']], how='inner')
+    if m.SOURCE is not None:
+        dst_file = m.SOURCE / 'dst_hourly.csv'
+        roti_file = m.SOURCE / 'roti_hourly.csv'
+        if dst_file.exists() and roti_file.exists():
+            dst = m.pd.read_csv(dst_file, parse_dates=['hour_utc']).set_index('hour_utc')
+            roti = m.pd.read_csv(roti_file, parse_dates=['hour_utc']).set_index('hour_utc')
+            return dst[['abs_dDst_dt_nT_per_h']].join(roti[['ROTI_TECU_per_min']], how='inner')
     LOG.warning('历史空间天气运行数据缺失；自动预测将安全回退到基础模型。')
     return None
 

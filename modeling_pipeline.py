@@ -65,29 +65,49 @@ PARAM_GRID = [
 RESIDUAL_WEIGHTS = (0.0, 0.25, 0.5, 0.75, 1.0)
 
 
-def discover_source(explicit: str | Path | None = None) -> Path:
-    """Find the immutable source folder without depending on nesting depth."""
-    candidates = []
+def source_candidates(explicit: str | Path | None = None) -> list[Path]:
+    """Return possible immutable training-source folders, nearest first."""
+    candidates: list[Path] = []
     if explicit:
         candidates.append(Path(explicit))
     if os.environ.get("MODEL_SOURCE_DIR"):
         candidates.append(Path(os.environ["MODEL_SOURCE_DIR"]))
-    candidates.extend([
-        BASE.parent / "outputs" / SOURCE_FOLDER,
-        BASE.parents[1] / "outputs" / SOURCE_FOLDER,
-        BASE / "outputs" / SOURCE_FOLDER,
-    ])
+    # ``BASE`` is normally a nested local checkout, but it is simply ``/app``
+    # in Railway.  Iterating over the available parents avoids indexing a
+    # parent level that does not exist in a shallow container path.
+    roots = [BASE, *list(BASE.parents)[:2]]
+    candidates.extend(root / "outputs" / SOURCE_FOLDER for root in roots)
+
+    unique: list[Path] = []
     seen = set()
     for candidate in candidates:
         resolved = candidate.expanduser().resolve()
         if resolved in seen:
             continue
         seen.add(resolved)
+        unique.append(resolved)
+    return unique
+
+
+def discover_source(explicit: str | Path | None = None) -> Path | None:
+    """Find local training inputs when present; deployment does not need them."""
+    for resolved in source_candidates(explicit):
         if all((resolved / name).is_file() for name in SOURCE_FILES):
             return resolved
-    checked = "\n".join(f"- {path}" for path in seen)
+    return None
+
+
+def require_source(explicit: str | Path | None = None) -> Path:
+    """Resolve the source for training/smoke runs or raise an actionable error."""
+    source = discover_source(explicit)
+    if source is not None:
+        return source
+    checked = "\n".join(f"- {path}" for path in source_candidates(explicit))
     raise FileNotFoundError(
-        "找不到重新建模所需的三个只读源文件。可设置 MODEL_SOURCE_DIR。已检查：\n" + checked
+        "训练或 smoke 检查需要三份只读源文件，但当前未找到。"
+        "网站运行不需要这些原始文件，会使用 data/historical_space.csv.gz。"
+        "如需重新建模，请设置 MODEL_SOURCE_DIR 或传入 --source-dir。已检查：\n"
+        + checked
     )
 
 
@@ -196,7 +216,7 @@ def airport_hours(departures: pd.DataFrame) -> pd.DataFrame:
 
 
 def prepare_hourly(source: Path | None = None) -> tuple[pd.DataFrame, dict[str, object]]:
-    source = SOURCE if source is None else Path(source).resolve()
+    source = require_source(source)
     source_snapshot = verify_sources(source)
     raw = pd.read_pickle(source / "flights_peK_raw_cache.pkl")
     departures, audit = physical_departures(raw)
